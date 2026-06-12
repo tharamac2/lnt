@@ -4,8 +4,9 @@ from pydantic import BaseModel, EmailStr
 from typing import List
 from sqlmodel import Session, select
 from ..database import get_session
-from ..models import User, UserCreate, UserRead, UserUpdate
+from ..models import User, UserCreate, UserRead, UserUpdate, Inspector
 from ..auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
+from ..audit import log_action
 from .. import email_utils
 from datetime import timedelta
 
@@ -15,54 +16,65 @@ router = APIRouter(prefix="/users", tags=["users"])
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
     statement = select(User).where(User.username == form_data.username)
     user = session.exec(statement).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No users found",
-            headers={"WWW-Authenticate": "Bearer"},
+    if user and verify_password(form_data.password, user.hashed_password):
+        if user.status != "active":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account is deactivated. Please contact an administrator.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.username, "role": user.role}, expires_delta=access_token_expires
         )
-    if user.status != "active":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your account is deactivated. Please contact an administrator.",
-            headers={"WWW-Authenticate": "Bearer"},
+
+        log_action(
+            session, user, "login", "User", user.id,
+            f"{user.full_name or user.username} logged in",
+            site=user.site,
+        )
+        session.commit()
+
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "role": user.role,
+            "full_name": user.full_name,
+            "site": user.site
+        }
+
+    # Fall back to Inspection Employee accounts (separate table, same login page)
+    statement = select(Inspector).where(Inspector.email == form_data.username)
+    inspector = session.exec(statement).first()
+    if inspector and verify_password(form_data.password, inspector.hashed_password):
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": inspector.email, "role": "inspection_employee", "type": "inspector"},
+            expires_delta=access_token_expires,
         )
 
-    # Credentials are valid - send a login OTP to the user's email before issuing a token
-    try:
-        email_utils.send_otp_email(user.email)
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to send verification email. Please try again.")
+        site = inspector.creator.site if inspector.creator else None
+        log_action(
+            session, inspector, "login", "Inspector", inspector.id,
+            f"{inspector.name} logged in",
+            site=site,
+        )
+        session.commit()
 
-    return {"otp_required": True, "email": user.email}
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "role": "inspection_employee",
+            "full_name": inspector.name,
+            "site": site,
+        }
 
-class LoginOTPVerifyRequest(BaseModel):
-    username: str
-    otp: str
-
-@router.post("/token/verify-otp")
-def verify_login_otp(payload: LoginOTPVerifyRequest, session: Session = Depends(get_session)):
-    statement = select(User).where(User.username == payload.username)
-    user = session.exec(statement).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="No users found")
-    if not email_utils.verify_otp(user.email, payload.otp):
-        raise HTTPException(status_code=400, detail="Invalid or expired verification code")
-    email_utils.clear_verification(user.email)
-
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username, "role": user.role}, expires_delta=access_token_expires
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="No users found",
+        headers={"WWW-Authenticate": "Bearer"},
     )
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "role": user.role,
-        "full_name": user.full_name,
-        "site": user.site
-    }
 
 class EmailRequest(BaseModel):
     email: EmailStr
@@ -124,6 +136,12 @@ def create_user(user: UserCreate, session: Session = Depends(get_session)): # Re
         site=db_user.site,
     )
     session.add(new_user_alert)
+
+    log_action(
+        session, db_user, "create", "User", db_user.id,
+        f"User account created: {db_user.full_name or db_user.username} ({db_user.role})",
+        site=db_user.site,
+    )
     session.commit()
     
     return db_user
@@ -147,9 +165,20 @@ def read_users(offset: int = 0, limit: int = 100, session: Session = Depends(get
     users = session.exec(select(User).offset(offset).limit(limit)).all()
     return users
 
-@router.get("/me", response_model=UserRead)
-async def read_users_me(current_user: User = Depends(get_current_user)):
-    return current_user
+@router.get("/me")
+async def read_users_me(current_user = Depends(get_current_user)):
+    if isinstance(current_user, Inspector):
+        return {
+            "id": current_user.id,
+            "username": current_user.email,
+            "email": current_user.email,
+            "full_name": current_user.name,
+            "role": "inspection_employee",
+            "site": current_user.creator.site if current_user.creator else None,
+            "phone": current_user.contact_number,
+            "status": current_user.status,
+        }
+    return UserRead(**current_user.dict(exclude={"hashed_password"}))
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(user_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
@@ -159,7 +188,13 @@ def delete_user(user_id: int, session: Session = Depends(get_session), current_u
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
+    log_action(
+        session, current_user, "delete", "User", user_id,
+        f"Deleted user {user.full_name or user.username} ({user.role})",
+        site=user.site,
+    )
+
     session.delete(user)
     session.commit()
     return None
@@ -188,7 +223,16 @@ def update_user(user_id: int, user_update: UserUpdate, session: Session = Depend
         
     for key, value in user_data.items():
         setattr(db_user, key, value)
-        
+
+    changed_fields = ", ".join(
+        "password" if k in ("password", "hashed_password") else k for k in user_data.keys()
+    ) or "-"
+    log_action(
+        session, current_user, "update", "User", user_id,
+        f"Updated user {db_user.full_name or db_user.username} - fields: {changed_fields}",
+        site=db_user.site,
+    )
+
     session.add(db_user)
     session.commit()
     session.refresh(db_user)

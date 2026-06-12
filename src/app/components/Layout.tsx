@@ -15,7 +15,12 @@ import {
   Users,
   Wrench,
   ChevronDown,
-  UserCircle
+  UserCircle,
+  UserPlus,
+  Truck,
+  History,
+  ScrollText,
+  ClipboardList,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -62,9 +67,39 @@ const navItems: NavItem[] = [
     roles: ['store'],
   },
   {
+    path: '/store-inventory',
+    label: 'Store Inventory',
+    icon: <Package className="w-5 h-5" />,
+    roles: ['store'],
+  },
+  {
+    path: '/tools-movements',
+    label: 'Tools Movements',
+    icon: <Truck className="w-5 h-5" />,
+    roles: ['store'],
+  },
+  {
+    path: '/tools-movement-history',
+    label: 'Tools Movement History',
+    icon: <History className="w-5 h-5" />,
+    roles: ['store'],
+  },
+  {
     path: '/inspector',
     label: 'Inspection',
     icon: <ClipboardCheck className="w-5 h-5" />,
+    roles: ['inspector', 'inspection_employee'],
+  },
+  {
+    path: '/inspector/results',
+    label: 'Inspection Results',
+    icon: <ClipboardList className="w-5 h-5" />,
+    roles: ['inspector', 'inspection_employee'],
+  },
+  {
+    path: '/inspector/add-employee',
+    label: 'Add Employee',
+    icon: <UserPlus className="w-5 h-5" />,
     roles: ['inspector'],
   },
   {
@@ -98,6 +133,18 @@ const navItems: NavItem[] = [
     roles: ['admin'],
   },
   {
+    path: '/audit-log',
+    label: 'Audit Log',
+    icon: <ScrollText className="w-5 h-5" />,
+    roles: ['admin'],
+  },
+  {
+    path: '/inspection-employees',
+    label: 'Inspection Employees',
+    icon: <UserCircle className="w-5 h-5" />,
+    roles: ['admin'],
+  },
+  {
     path: '/settings',
     label: 'Settings',
     icon: <Settings className="w-5 h-5" />,
@@ -120,7 +167,7 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#CFDBFF]">
+    <div className="min-h-screen flex flex-col bg-[#CFDBFF]">
       {/* Top Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="flex items-center justify-between px-4 py-3">
@@ -202,7 +249,7 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
                   <div className="text-right hidden sm:block">
                     <p className="text-sm font-medium text-[#0F172A]">{user.name}</p>
                     <p className="text-xs text-gray-500 capitalize">
-                      {user.role} {user.site && (user.role === 'store' || user.role === 'inspector' || user.role === 'data_entry') ? `- ${user.site}` : ''}
+                      {user.role} {user.site && (user.role === 'store' || user.role === 'inspector' || user.role === 'inspection_employee' || user.role === 'data_entry') ? `- ${user.site}` : ''}
                     </p>
                   </div>
                   <div className="w-10 h-10 rounded-full bg-[#1E3A8A] flex items-center justify-center text-white font-medium">
@@ -216,7 +263,7 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">{user?.name}</p>
                     <p className="text-xs leading-none text-muted-foreground capitalize">
-                      {user?.role} {user?.site && (user?.role === 'store' || user?.role === 'inspector' || user?.role === 'data_entry') ? `- ${user.site}` : ''}
+                      {user?.role} {user?.site && (user?.role === 'store' || user?.role === 'inspector' || user?.role === 'inspection_employee' || user?.role === 'data_entry') ? `- ${user.site}` : ''}
                     </p>
                   </div>
                 </DropdownMenuLabel>
@@ -231,10 +278,10 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
         </div>
       </header>
 
-      <div className="flex">
+      <div className="flex flex-1">
         {/* Sidebar - Desktop */}
         <aside
-          className={`hidden lg:flex flex-col bg-white border-r border-gray-200 transition-all duration-300 shrink-0 ${sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'
+          className={`hidden lg:flex flex-col bg-white border-r border-gray-200 transition-all duration-300 shrink-0 sticky top-16 h-[calc(100vh-4rem)] ${sidebarOpen ? 'w-64 overflow-y-auto' : 'w-0 overflow-hidden'
             }`}
         >
           <nav className="p-4 space-y-1 flex-1">

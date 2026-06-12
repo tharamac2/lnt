@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -9,65 +9,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import {
   QrCode,
-  MapPin,
   Save,
-  Wrench,
   ArrowDownCircle,
   ArrowUpCircle,
   AlertTriangle,
   User,
   Truck,
-  Store,
-  Search,
-  X,
-  Download
 } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select';
-import { Checkbox } from '../components/ui/checkbox';
 import api from '../services/api';
 import { toast } from 'sonner';
 import { Html5Qrcode } from 'html5-qrcode';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../components/ui/table';
 import ScannerDialog from '../components/ScannerDialog';
+import { generateDeliveryChallanPDF } from '../utils/deliveryChallan';
 
 const StoreView = () => {
+  const location = useLocation();
   const [storeLocation, setStoreLocation] = useState<string>('Store');
-  const [inventoryTools, setInventoryTools] = useState<any[]>([]);
-
-  // Inventory search, filters & bulk selection
-  const [inventorySearch, setInventorySearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [makeFilter, setMakeFilter] = useState('all');
-  const [selectedToolIds, setSelectedToolIds] = useState<Set<number>>(new Set());
-
-  // Bulk Transaction State
-  const [bulkActionMode, setBulkActionMode] = useState<'in' | 'out' | null>(null);
-  const [bulkInSubCategory, setBulkInSubCategory] = useState('new_product');
-  const [bulkOutSubCategory, setBulkOutSubCategory] = useState('subcon_work');
-  const [bulkFormData, setBulkFormData] = useState({
-    subcontractorName: '',
-    subcontractorCode: '',
-    subcontractorMobile: '',
-    targetSite: '',
-    remarks: ''
-  });
-  const [bulkMobileError, setBulkMobileError] = useState('');
-  const [bulkSubmitting, setBulkSubmitting] = useState(false);
 
   const [scannedTool, setScannedTool] = useState<any>(null);
   const [scanning, setScanning] = useState(false);
@@ -105,136 +62,27 @@ const StoreView = () => {
       default: return 'bg-gray-100 text-gray-700';
     }
   };
-  const uniqueMakes = useMemo(() => {
-    const makes = new Set<string>();
-    inventoryTools.forEach((tool) => {
-      if (tool.make) makes.add(tool.make);
-    });
-    return Array.from(makes).sort();
-  }, [inventoryTools]);
-
-  const filteredInventoryTools = useMemo(() => {
-    const query = inventorySearch.trim().toLowerCase();
-    return inventoryTools.filter((tool) => {
-      if (statusFilter !== 'all' && tool.status !== statusFilter) return false;
-      if (makeFilter !== 'all' && tool.make !== makeFilter) return false;
-      if (!query) return true;
-      return (
-        (tool.description || '').toLowerCase().includes(query) ||
-        (tool.qr_code || '').toLowerCase().includes(query) ||
-        (tool.make || '').toLowerCase().includes(query) ||
-        (tool.capacity || '').toLowerCase().includes(query)
-      );
-    });
-  }, [inventoryTools, inventorySearch, statusFilter, makeFilter]);
-
-  const toggleToolSelection = (toolId: number) => {
-    setSelectedToolIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(toolId)) {
-        next.delete(toolId);
-      } else {
-        next.add(toolId);
-      }
-      return next;
-    });
-  };
-
-  const allFilteredSelected = filteredInventoryTools.length > 0 &&
-    filteredInventoryTools.every((tool) => selectedToolIds.has(tool.id));
-
-  const toggleSelectAll = () => {
-    setSelectedToolIds((prev) => {
-      if (allFilteredSelected) {
-        const next = new Set(prev);
-        filteredInventoryTools.forEach((tool) => next.delete(tool.id));
-        return next;
-      }
-      const next = new Set(prev);
-      filteredInventoryTools.forEach((tool) => next.add(tool.id));
-      return next;
-    });
-  };
-
-  const clearSelection = () => setSelectedToolIds(new Set());
-
-  const selectedTools = useMemo(
-    () => inventoryTools.filter((tool) => selectedToolIds.has(tool.id)),
-    [inventoryTools, selectedToolIds]
-  );
-
-  // Sub-Contractor Return is only valid for tools currently dispatched to a sub-contractor
-  const allSelectedHaveSubcontractor = selectedTools.length > 0 &&
-    selectedTools.every((tool) => !!tool.subcontractor_name);
-  // Found/Recovered is only valid for tools currently reported missing/stolen
-  const allSelectedMissingOrStolen = selectedTools.length > 0 &&
-    selectedTools.every((tool) => tool.status === 'missing' || tool.status === 'stolen');
-  // Scrap disposal is only valid if every selected tool is already marked scrap/scrapped
-  const allSelectedScrap = selectedTools.length > 0 &&
-    selectedTools.every((tool) => tool.status === 'scrap' || tool.status === 'scrapped');
-  // Sub-contractor issue / site transfer are not valid if any selected tool is scrap/scrapped
-  const anySelectedScrap = selectedTools.some((tool) => tool.status === 'scrap' || tool.status === 'scrapped');
-
-  const openBulkReceipt = () => {
-    setBulkInSubCategory(allSelectedHaveSubcontractor ? 'subcon_return' : 'new_product');
-    setBulkActionMode('in');
-  };
-
-  const openBulkDispatch = () => {
-    setBulkOutSubCategory(allSelectedScrap ? 'scrap_disposal' : 'subcon_work');
-    setBulkActionMode('out');
-  };
-
-  const exportSelectedInventoryPDF = () => {
-    const selectedTools = inventoryTools.filter((tool) => selectedToolIds.has(tool.id));
-    if (selectedTools.length === 0) return;
-
-    const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.setTextColor(30, 58, 138);
-    doc.text(`${storeLocation} Inventory - Selected Items`, 14, 15);
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 22);
-
-    autoTable(doc, {
-      head: [['Description', 'QR / Tracking', 'Make', 'Capacity', 'Status']],
-      body: selectedTools.map((tool) => [
-        tool.description,
-        tool.qr_code,
-        tool.make,
-        tool.capacity,
-        tool.status,
-      ]),
-      startY: 28,
-      theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [30, 58, 138] },
-    });
-
-    doc.save(`${storeLocation}_Selected_Inventory_${Date.now()}.pdf`);
-    toast.success(`Exported ${selectedTools.length} item(s) to PDF`);
-  };
-
-  const refreshInventory = async () => {
+  const refreshStoreLocation = async () => {
     try {
       const userRes = await api.get('/users/me');
-      const site = userRes.data.site;
-      if (site) {
-        setStoreLocation(site);
-        const toolsRes = await api.get(`/tools/?site=${site}&limit=10000000`);
-        setInventoryTools(toolsRes.data);
-      } else {
-        setStoreLocation('Store');
-      }
+      setStoreLocation(userRes.data.site || 'Store');
     } catch (err) {
-      console.error("Failed to fetch user site or inventory", err);
+      console.error("Failed to fetch user site", err);
     }
   };
 
   useEffect(() => {
-    refreshInventory();
-  }, [lastTransaction]);
+    refreshStoreLocation();
+  }, []);
+
+  // If navigated here from Store Inventory with a specific tool, load it
+  useEffect(() => {
+    const qrCode = (location.state as any)?.qrCode;
+    if (qrCode) {
+      fetchToolDetails(qrCode);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   const triggerScan = () => {
     fileInputRef.current?.click();
@@ -299,234 +147,42 @@ const StoreView = () => {
 
 
 
-  const generatePDF = (tool: any, transactionDetails: any, remarks: string, type: 'RECEIPT' | 'DISPATCH' = 'RECEIPT') => {
-    try {
-      const doc = new jsPDF();
+  const generatePDF = (tool: any, transactionDetails: string, remarks: string, type: 'RECEIPT' | 'DISPATCH' = 'RECEIPT') => {
+    let consignee = storeLocation;
+    let siteCode: string | undefined;
 
-      // --- Header ---
-      doc.setFontSize(22);
-      doc.setTextColor(30, 58, 138); // #1E3A8A Blue
-      // "Inward Delivery Challan" for Receipt, "Outward Delivery Challan" for Dispatch
-      const title = type === 'RECEIPT' ? "Inward Delivery Challan" : "Outward Delivery Challan";
-      doc.text(title, 105, 20, { align: "center" });
-
-      // --- Meta Info ---
-      doc.setFontSize(10);
-      doc.setTextColor(100);
-      doc.text(`Generated: ${new Date().toLocaleString()}`, 105, 30, { align: "center" });
-      doc.text(`Transaction ID: ${Date.now()}`, 105, 35, { align: "center" });
-
-      doc.setLineWidth(0.5);
-      doc.line(15, 40, 195, 40);
-
-      // --- Tool Details Box ---
-      // Box: x=15, y=45, w=180, h=45
-      doc.setDrawColor(200); // Light Gray Border
-      doc.setFillColor(250); // Very Light Gray BG
-      doc.rect(15, 45, 180, 45, 'FD'); // Fill and Draw
-
-      doc.setFontSize(14);
-      doc.setTextColor(0);
-      doc.text("Tool Details", 20, 55);
-
-      doc.setFontSize(11);
-      doc.setTextColor(50);
-      doc.text(`Description:`, 20, 65); doc.text(tool.description, 60, 65);
-      doc.text(`QR Code:`, 20, 72); doc.text(tool.qr_code, 60, 72);
-      doc.text(`Make:`, 20, 79); doc.text(tool.make, 60, 79);
-      doc.text(`Capacity:`, 20, 86); doc.text(`${tool.capacity} (SWL: ${tool.safe_working_load})`, 60, 86);
-
-      // --- Transaction Details Box ---
-      // Box: x=15, y=95, w=180, h=55
-      doc.setDrawColor(200);
-      doc.setFillColor(255); // White BG
-      doc.rect(15, 95, 180, 55, 'S'); // Stroke only
-
-      doc.setFontSize(14);
-      doc.setTextColor(0);
-      doc.text("Transaction Details", 20, 105);
-
-      doc.setFontSize(11);
-      doc.setTextColor(50);
-      doc.text(`Type:`, 20, 115); doc.text(type === 'RECEIPT' ? "Receipt (Inward)" : "Dispatch (Outward)", 60, 115);
-      doc.text(`Category:`, 20, 122); doc.text(transactionDetails.replace('_', ' ').toUpperCase(), 60, 122);
-
-      if (type === 'RECEIPT') {
-        if (transactionDetails === 'subcon_return' && tool.subcontractor_name) {
-          doc.text(`Returned By:`, 20, 129); doc.text(tool.subcontractor_name, 60, 129);
-        } else {
-          doc.text(`Source:`, 20, 129); doc.text("External / Site", 60, 129);
-        }
-        doc.text(`Destination:`, 20, 136); doc.text(storeLocation, 60, 136);
-      } else {
-        // DISPATCH
-        if (transactionDetails === 'subcon_work' && tool.subcontractor_name) {
-          doc.text(`Issued To:`, 20, 129); doc.text(tool.subcontractor_name || 'Sub-Contractor', 60, 129);
-        } else {
-          doc.text(`Destination:`, 20, 129); doc.text("Site Transfer", 60, 129);
-        }
-        doc.text(`Source:`, 20, 136); doc.text(storeLocation, 60, 136);
+    if (type === 'DISPATCH') {
+      if (transactionDetails === 'subcon_work') {
+        consignee = tool.subcontractor_name || 'Sub-Contractor';
+        siteCode = tool.subcontractor_code || undefined;
+      } else if (transactionDetails === 'site_transfer') {
+        consignee = tool.current_site || 'Site';
+      } else if (transactionDetails === 'scrap_disposal') {
+        consignee = tool.subcontractor_name || 'Scrap Dealer';
+        siteCode = tool.subcontractor_code || undefined;
       }
-
-      doc.text(`Remarks:`, 20, 143); doc.text(remarks || '-', 60, 143, { maxWidth: 120 });
-
-      // --- Footer ---
-      doc.setLineWidth(0.5);
-      doc.setDrawColor(0); // Black line
-      doc.line(20, 250, 190, 250);
-
-      doc.setFontSize(10);
-      doc.text("Authorized Signature", 150, 270, { align: "center" });
-      doc.line(130, 265, 170, 265);
-
-      // Save
-      const filename = `${type === 'RECEIPT' ? 'Inward' : 'Outward'}_Challan_${tool.qr_code}_${Date.now()}.pdf`;
-      doc.save(filename);
-      toast.success(`${type === 'RECEIPT' ? 'Inward' : 'Outward'} Challan Downloaded`);
-    } catch (pdfError) {
-      console.error("PDF Generation failed", pdfError);
-      toast.error("Failed to generate PDF");
     }
-  };
 
-
-  const generateBulkPDF = (tools: any[], transactionDetails: string, remarks: string, type: 'RECEIPT' | 'DISPATCH') => {
-    try {
-      const doc = new jsPDF();
-
-      doc.setFontSize(18);
-      doc.setTextColor(30, 58, 138);
-      const title = type === 'RECEIPT' ? "Bulk Inward Delivery Challan" : "Bulk Outward Delivery Challan";
-      doc.text(title, 105, 18, { align: "center" });
-
-      doc.setFontSize(10);
-      doc.setTextColor(100);
-      doc.text(`Generated: ${new Date().toLocaleString()}`, 105, 26, { align: "center" });
-      doc.text(`Transaction ID: ${Date.now()}`, 105, 31, { align: "center" });
-
-      doc.setFontSize(11);
-      doc.setTextColor(50);
-      let y = 40;
-      doc.text(`Type:`, 14, y); doc.text(type === 'RECEIPT' ? "Receipt (Inward)" : "Dispatch (Outward)", 50, y);
-      y += 6;
-      doc.text(`Category:`, 14, y); doc.text(transactionDetails.replace(/_/g, ' ').toUpperCase(), 50, y);
-      y += 6;
-      if (type === 'RECEIPT') {
-        doc.text(`Destination:`, 14, y); doc.text(storeLocation, 50, y);
-      } else {
-        doc.text(`Source:`, 14, y); doc.text(storeLocation, 50, y);
-      }
-      y += 6;
-      doc.text(`Remarks:`, 14, y); doc.text(remarks || '-', 50, y, { maxWidth: 145 });
-      y += 8;
-
-      autoTable(doc, {
-        head: [['Description', 'QR / Tracking', 'Make', 'Capacity']],
-        body: tools.map((tool) => [tool.description, tool.qr_code, tool.make, tool.capacity]),
-        startY: y,
-        theme: 'grid',
-        styles: { fontSize: 8, cellPadding: 2 },
-        headStyles: { fillColor: [30, 58, 138] },
+    generateDeliveryChallanPDF({
+      type,
+      consignee,
+      siteCode,
+      remarks,
+      items: [{
+        description: tool.description,
+        qrCode: tool.qr_code,
+        quantity: '1',
+        unit: 'NOS',
+      }],
+      filename: `${type === 'RECEIPT' ? 'Inward' : 'Outward'}_Challan_${tool.qr_code}_${Date.now()}.pdf`,
+    })
+      .then(() => toast.success(`${type === 'RECEIPT' ? 'Inward' : 'Outward'} Challan Downloaded`))
+      .catch((pdfError) => {
+        console.error("PDF Generation failed", pdfError);
+        toast.error("Failed to generate PDF");
       });
-
-      doc.save(`Bulk_${type === 'RECEIPT' ? 'Inward' : 'Outward'}_Challan_${Date.now()}.pdf`);
-      toast.success(`${type === 'RECEIPT' ? 'Inward' : 'Outward'} Challan Downloaded`);
-    } catch (pdfError) {
-      console.error("PDF Generation failed", pdfError);
-      toast.error("Failed to generate PDF");
-    }
   };
 
-  const handleBulkSubmit = async () => {
-    if (selectedTools.length === 0 || !bulkActionMode) return;
-
-    if ((bulkActionMode === 'out' && bulkOutSubCategory === 'subcon_work') ||
-      (bulkActionMode === 'out' && bulkOutSubCategory === 'scrap_disposal')) {
-      if (bulkFormData.subcontractorMobile && !/^\d{10}$/.test(bulkFormData.subcontractorMobile)) {
-        toast.error("Please enter a valid 10-digit mobile number");
-        return;
-      }
-    }
-
-    if (bulkActionMode === 'out' && bulkOutSubCategory === 'site_transfer' && !bulkFormData.targetSite) {
-      toast.error("Please enter a destination site");
-      return;
-    }
-
-    setBulkSubmitting(true);
-    try {
-      const updatedTools: any[] = [];
-
-      for (const tool of selectedTools) {
-        const payload: any = { previous_site: tool.current_site };
-
-        if (bulkActionMode === 'in') {
-          payload.current_site = storeLocation;
-          if (bulkInSubCategory === 'subcon_return') {
-            payload.subcontractor_name = null;
-            payload.subcontractor_code = null;
-            payload.remarks = `Returned from Sub-Contractor (Bulk). ${bulkFormData.remarks}`;
-          } else if (bulkInSubCategory === 'new_product') {
-            payload.remarks = `New Product Received (Bulk). ${bulkFormData.remarks}`;
-          } else if (bulkInSubCategory === 'site_receive') {
-            payload.remarks = `Received from Site ${tool.current_site} (Bulk). ${bulkFormData.remarks}`;
-          } else if (bulkInSubCategory === 'found_recovered') {
-            payload.status = 'usable';
-            payload.debit_to = null;
-            payload.subcontractor_name = null;
-            payload.subcontractor_code = null;
-            payload.remarks = `Tool Found/Recovered (Bulk). Previous status: ${tool.status}. ${bulkFormData.remarks}`;
-          }
-        } else {
-          if (bulkOutSubCategory === 'subcon_work') {
-            payload.current_site = bulkFormData.targetSite || tool.current_site;
-            payload.subcontractor_name = bulkFormData.subcontractorName;
-            payload.subcontractor_code = bulkFormData.subcontractorCode;
-            payload.subcontractor_mobile = bulkFormData.subcontractorMobile;
-            payload.remarks = `Issued to Sub-Contractor (Bulk). ${bulkFormData.remarks}`;
-          } else if (bulkOutSubCategory === 'site_transfer') {
-            payload.current_site = bulkFormData.targetSite;
-            payload.subcontractor_name = null;
-            payload.subcontractor_code = null;
-            payload.remarks = `Transferred to Site: ${bulkFormData.targetSite} (Bulk). ${bulkFormData.remarks}`;
-          } else if (bulkOutSubCategory === 'scrap_disposal') {
-            payload.status = 'scrapped';
-            payload.current_site = 'Scrap Yard';
-            payload.subcontractor_name = bulkFormData.subcontractorName;
-            payload.subcontractor_code = bulkFormData.subcontractorCode;
-            payload.subcontractor_mobile = bulkFormData.subcontractorMobile;
-            payload.debit_to = null;
-            payload.remarks = `Sent to Scrap Dealer: ${bulkFormData.subcontractorName} (${bulkFormData.subcontractorCode}) (Bulk). ${bulkFormData.remarks}`;
-          }
-        }
-
-        await api.patch(`/tools/${tool.id}`, payload);
-        updatedTools.push({ ...tool, ...payload });
-      }
-
-      toast.success(`Bulk ${bulkActionMode === 'in' ? 'Receipt' : 'Dispatch'} recorded for ${selectedTools.length} item(s)`);
-
-      const transactionDetails = bulkActionMode === 'in' ? bulkInSubCategory : bulkOutSubCategory;
-      const pdfType = bulkActionMode === 'in' ? 'RECEIPT' : 'DISPATCH';
-      setTimeout(() => {
-        generateBulkPDF(updatedTools, transactionDetails, bulkFormData.remarks, pdfType);
-      }, 500);
-
-      setBulkActionMode(null);
-      clearSelection();
-      setBulkFormData({ subcontractorName: '', subcontractorCode: '', subcontractorMobile: '', targetSite: '', remarks: '' });
-      setBulkMobileError('');
-      await refreshInventory();
-      if (scannedTool) {
-        refreshTool();
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to complete bulk transaction");
-    } finally {
-      setBulkSubmitting(false);
-    }
-  };
 
   const handleSubmit = async () => {
     if (!scannedTool) return;
@@ -655,365 +311,6 @@ const StoreView = () => {
         </div>
 
       </div>
-
-      {/* Inventory List */}
-      {storeLocation && (
-        <Card className="animate-in fade-in slide-in-from-top-4 duration-500 mb-6 mt-6">
-          <CardHeader className="bg-gray-50 pb-2 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <MapPin className="text-[#1E3A8A] w-5 h-5"/>
-                {storeLocation} Inventory
-              </CardTitle>
-              <CardDescription>
-                Tools actively stationed at {storeLocation}
-              </CardDescription>
-            </div>
-            <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 shadow-sm text-sm py-1 px-3">
-              {filteredInventoryTools.length} of {inventoryTools.length} {inventoryTools.length === 1 ? 'Item' : 'Items'}
-            </Badge>
-          </CardHeader>
-
-          {/* Search & Filters */}
-          {inventoryTools.length > 0 && (
-            <div className="p-3 border-b border-gray-100 flex flex-col md:flex-row gap-2 md:items-center bg-white">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
-                  placeholder="Search by description, QR code, make or capacity..."
-                  className="pl-8 h-9"
-                  value={inventorySearch}
-                  onChange={(e) => setInventorySearch(e.target.value)}
-                />
-                {inventorySearch && (
-                  <button
-                    type="button"
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    onClick={() => setInventorySearch('')}
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 w-full md:w-[150px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="usable">Usable</SelectItem>
-                  <SelectItem value="scrap">Scrap</SelectItem>
-                  <SelectItem value="scrapped">Scrapped</SelectItem>
-                  <SelectItem value="missing">Missing</SelectItem>
-                  <SelectItem value="stolen">Stolen</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={makeFilter} onValueChange={setMakeFilter}>
-                <SelectTrigger className="h-9 w-full md:w-[150px]">
-                  <SelectValue placeholder="Make" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Makes</SelectItem>
-                  {uniqueMakes.map((make) => (
-                    <SelectItem key={make} value={make}>{make}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Bulk Selection Toolbar */}
-          {selectedToolIds.size > 0 && (
-            <div className="px-3 py-2 border-b border-blue-100 bg-blue-50 flex items-center justify-between gap-2 flex-wrap">
-              <span className="text-sm text-blue-800 font-medium">
-                {selectedToolIds.size} item{selectedToolIds.size === 1 ? '' : 's'} selected
-              </span>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  size="sm"
-                  className={`h-8 ${bulkActionMode === 'in' ? 'bg-green-700 hover:bg-green-800' : 'bg-green-600 hover:bg-green-700'} text-white`}
-                  onClick={openBulkReceipt}
-                >
-                  <ArrowDownCircle className="w-3.5 h-3.5 mr-1.5" />
-                  Receipt (IN)
-                </Button>
-                <Button
-                  size="sm"
-                  className={`h-8 ${bulkActionMode === 'out' ? 'bg-blue-700 hover:bg-blue-800' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
-                  onClick={openBulkDispatch}
-                >
-                  <ArrowUpCircle className="w-3.5 h-3.5 mr-1.5" />
-                  Dispatch (OUT)
-                </Button>
-                <Button size="sm" variant="outline" className="h-8 bg-white" onClick={exportSelectedInventoryPDF}>
-                  <Download className="w-3.5 h-3.5 mr-1.5" />
-                  Export List
-                </Button>
-                <Button size="sm" variant="ghost" className="h-8 text-gray-500" onClick={() => { clearSelection(); setBulkActionMode(null); }}>
-                  <X className="w-3.5 h-3.5 mr-1.5" />
-                  Clear
-                </Button>
-              </div>
-            </div>
-          )}
-
-          <CardContent className="p-0">
-            {inventoryTools.length > 0 ? (
-              filteredInventoryTools.length > 0 ? (
-              <div className="max-h-[300px] overflow-auto">
-                <Table>
-                  <TableHeader className="bg-white sticky top-0 border-b border-gray-100 z-10 shadow-sm">
-                    <TableRow>
-                      <TableHead className="w-10">
-                        <Checkbox
-                          checked={allFilteredSelected}
-                          onCheckedChange={toggleSelectAll}
-                          aria-label="Select all"
-                        />
-                      </TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>QR / Tracking</TableHead>
-                      <TableHead>Make & Capacity</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredInventoryTools.map((tool) => (
-                      <TableRow key={tool.id} className="hover:bg-blue-50/20 cursor-pointer" onClick={() => fetchToolDetails(tool.qr_code)}>
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedToolIds.has(tool.id)}
-                            onCheckedChange={() => toggleToolSelection(tool.id)}
-                            aria-label={`Select ${tool.description}`}
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium text-[#1E3A8A]">{tool.description}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-[10px] text-gray-500">{tool.qr_code}</Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-gray-600">
-                           {tool.make} <span className="text-xs text-gray-400 block">{tool.capacity}</span>
-                        </TableCell>
-                        <TableCell>
-                           <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase whitespace-nowrap ${getStatusColor(tool.status)}`}>
-                             {tool.status}
-                           </span>
-                           {tool.subcontractor_name && (
-                             <span className="block text-[10px] text-gray-400 mt-0.5 truncate max-w-[120px]" title={tool.subcontractor_name}>
-                               held by: {tool.subcontractor_name}
-                             </span>
-                           )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              ) : (
-                <div className="p-8 text-center text-gray-400 flex flex-col items-center">
-                  <Search className="w-12 h-12 text-gray-200 mb-2"/>
-                  <p>No tools match your search or filters.</p>
-                </div>
-              )
-            ) : (
-              <div className="p-8 text-center text-gray-400 flex flex-col items-center">
-                <Store className="w-12 h-12 text-gray-200 mb-2"/>
-                <p>This location has no tools currently registered.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Bulk Transaction Panel */}
-      {bulkActionMode && selectedTools.length > 0 && (
-        <Card className="border-l-4 border-l-[#1E3A8A] animate-in fade-in slide-in-from-top-2 duration-300">
-          <CardHeader className="bg-gray-50 pb-2">
-            <CardTitle className="text-xl flex items-center gap-2">
-              {bulkActionMode === 'in' ? <ArrowDownCircle className="text-green-600 w-5 h-5" /> : <ArrowUpCircle className="text-blue-600 w-5 h-5" />}
-              Bulk {bulkActionMode === 'in' ? 'Receipt (IN)' : 'Dispatch (OUT)'}
-              <Badge variant="outline">{selectedTools.length} item{selectedTools.length === 1 ? '' : 's'}</Badge>
-            </CardTitle>
-            <CardDescription>
-              This transaction will be applied to all {selectedTools.length} selected tools.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6 pt-6">
-            {bulkActionMode === 'in' && (
-              <div className="space-y-4 animate-in slide-in-from-left-2">
-                <Label>Receipt Type</Label>
-                <RadioGroup value={bulkInSubCategory} onValueChange={setBulkInSubCategory} className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <div className={`flex items-center space-x-2 border p-3 rounded-md cursor-pointer ${!allSelectedHaveSubcontractor ? 'opacity-50 bg-gray-100 cursor-not-allowed' : 'hover:bg-gray-50'}`}>
-                    <RadioGroupItem value="subcon_return" id="br1" disabled={!allSelectedHaveSubcontractor} />
-                    <Label htmlFor="br1" className={`cursor-pointer ${!allSelectedHaveSubcontractor ? 'cursor-not-allowed text-gray-400' : ''}`}>Sub-Contractor Return</Label>
-                  </div>
-                  <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-gray-50">
-                    <RadioGroupItem value="new_product" id="br2" />
-                    <Label htmlFor="br2" className="cursor-pointer">New Product Supply</Label>
-                  </div>
-                  <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-gray-50">
-                    <RadioGroupItem value="site_receive" id="br3" />
-                    <Label htmlFor="br3" className="cursor-pointer">From Other Site</Label>
-                  </div>
-                  <div className={`flex items-center space-x-2 border p-3 rounded-md cursor-pointer ${!allSelectedMissingOrStolen ? 'opacity-50 bg-gray-100 cursor-not-allowed' : 'hover:bg-green-50 border-green-200 bg-green-50/50'}`}>
-                    <RadioGroupItem value="found_recovered" id="br4" disabled={!allSelectedMissingOrStolen} />
-                    <Label htmlFor="br4" className={`cursor-pointer font-medium ${!allSelectedMissingOrStolen ? 'cursor-not-allowed text-gray-400' : 'text-green-800'}`}>Found / Recovered</Label>
-                  </div>
-                </RadioGroup>
-
-                {!allSelectedHaveSubcontractor && (
-                  <p className="text-xs text-gray-500">Sub-Contractor Return is only available when every selected tool is currently issued to a sub-contractor.</p>
-                )}
-                {!allSelectedMissingOrStolen && (
-                  <p className="text-xs text-gray-500">Found / Recovered is only available when every selected tool is currently reported Missing or Stolen.</p>
-                )}
-
-                {bulkInSubCategory === 'subcon_return' && (
-                  <div className="bg-orange-50 p-3 rounded text-sm text-orange-800 border border-orange-200">
-                    <strong>Action:</strong> Selected tools will be marked as returned to Store. Sub-contractor assignment will be cleared.
-                  </div>
-                )}
-                {bulkInSubCategory === 'found_recovered' && (
-                  <div className="bg-green-50 p-3 rounded text-sm text-green-800 border border-green-200">
-                    <strong>Action:</strong> Selected tools' status will be reset to <b>Usable</b>. Liability (Debit To) will be cleared. Tools returned to Store.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {bulkActionMode === 'out' && (
-              <div className="space-y-4 animate-in slide-in-from-right-2">
-                <Label>Dispatch Type</Label>
-                <RadioGroup value={bulkOutSubCategory} onValueChange={setBulkOutSubCategory} className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <div className={`flex items-center space-x-2 border p-3 rounded-md cursor-pointer ${anySelectedScrap ? 'opacity-50 bg-gray-100 cursor-not-allowed' : 'hover:bg-gray-50'}`}>
-                    <RadioGroupItem value="subcon_work" id="bd1" disabled={anySelectedScrap} />
-                    <Label htmlFor="bd1" className={`cursor-pointer ${anySelectedScrap ? 'cursor-not-allowed text-gray-400' : ''}`}>Issue to Sub-Contractor</Label>
-                  </div>
-                  <div className={`flex items-center space-x-2 border p-3 rounded-md cursor-pointer ${anySelectedScrap ? 'opacity-50 bg-gray-100 cursor-not-allowed' : 'hover:bg-gray-50'}`}>
-                    <RadioGroupItem value="site_transfer" id="bd2" disabled={anySelectedScrap} />
-                    <Label htmlFor="bd2" className={`cursor-pointer ${anySelectedScrap ? 'cursor-not-allowed text-gray-400' : ''}`}>Transfer to Next Site</Label>
-                  </div>
-                  <div className={`flex items-center space-x-2 border p-3 rounded-md cursor-pointer ${!allSelectedScrap ? 'opacity-50 bg-gray-100 cursor-not-allowed' : 'hover:bg-red-50 border-red-200'}`}>
-                    <RadioGroupItem value="scrap_disposal" id="bd3" disabled={!allSelectedScrap} />
-                    <Label htmlFor="bd3" className={`cursor-pointer ${!allSelectedScrap ? 'cursor-not-allowed text-gray-400' : 'text-red-700'}`}>Issue to Scrap Dealer</Label>
-                  </div>
-                </RadioGroup>
-
-                {anySelectedScrap && (
-                  <p className="text-xs text-gray-500">Issue to Sub-Contractor / Transfer are disabled because one or more selected tools are marked Scrap.</p>
-                )}
-                {!allSelectedScrap && (
-                  <p className="text-xs text-gray-500">Issue to Scrap Dealer is only available when every selected tool is already marked Scrap.</p>
-                )}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-              {bulkActionMode === 'out' && bulkOutSubCategory === 'subcon_work' && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Sub-Contractor Name</Label>
-                    <Input
-                      placeholder="Name"
-                      value={bulkFormData.subcontractorName}
-                      onChange={(e) => setBulkFormData({ ...bulkFormData, subcontractorName: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Sub-Contractor Code</Label>
-                    <Input
-                      placeholder="Code"
-                      value={bulkFormData.subcontractorCode}
-                      onChange={(e) => setBulkFormData({ ...bulkFormData, subcontractorCode: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label className="flex justify-between">
-                      Sub-Contractor Mobile
-                      {bulkMobileError && <span className="text-red-500 text-[10px]">{bulkMobileError}</span>}
-                    </Label>
-                    <Input
-                      placeholder="10-digit mobile number"
-                      value={bulkFormData.subcontractorMobile}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                        setBulkFormData({ ...bulkFormData, subcontractorMobile: val });
-                        setBulkMobileError(val && val.length !== 10 ? 'Must be 10 digits' : '');
-                      }}
-                    />
-                  </div>
-                </>
-              )}
-
-              {bulkActionMode === 'out' && bulkOutSubCategory === 'scrap_disposal' && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Scrap Dealer Name</Label>
-                    <Input
-                      placeholder="Dealer Name"
-                      value={bulkFormData.subcontractorName}
-                      onChange={(e) => setBulkFormData({ ...bulkFormData, subcontractorName: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Scrap Dealer Code</Label>
-                    <Input
-                      placeholder="Dealer Code"
-                      value={bulkFormData.subcontractorCode}
-                      onChange={(e) => setBulkFormData({ ...bulkFormData, subcontractorCode: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label className="flex justify-between">
-                      Scrap Dealer Mobile
-                      {bulkMobileError && <span className="text-red-500 text-[10px]">{bulkMobileError}</span>}
-                    </Label>
-                    <Input
-                      placeholder="10-digit mobile number"
-                      value={bulkFormData.subcontractorMobile}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                        setBulkFormData({ ...bulkFormData, subcontractorMobile: val });
-                        setBulkMobileError(val && val.length !== 10 ? 'Must be 10 digits' : '');
-                      }}
-                    />
-                  </div>
-                </>
-              )}
-
-              {((bulkActionMode === 'out' && (bulkOutSubCategory === 'subcon_work' || bulkOutSubCategory === 'site_transfer')) || (bulkActionMode === 'in' && bulkInSubCategory === 'site_receive')) && (
-                <div className="space-y-2">
-                  <Label>{bulkActionMode === 'out' ? 'Destination Site' : 'Origin Site (Optional)'}</Label>
-                  <Input
-                    placeholder="Site Name"
-                    value={bulkFormData.targetSite}
-                    onChange={(e) => setBulkFormData({ ...bulkFormData, targetSite: e.target.value })}
-                  />
-                </div>
-              )}
-
-              <div className="space-y-2 md:col-span-2">
-                <Label>Remarks</Label>
-                <Input
-                  placeholder="Enter additional details..."
-                  value={bulkFormData.remarks}
-                  onChange={(e) => setBulkFormData({ ...bulkFormData, remarks: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <Button className="flex-1 bg-[#1E3A8A]" onClick={handleBulkSubmit} disabled={bulkSubmitting}>
-                <Save className="w-4 h-4 mr-2" />
-                {bulkSubmitting ? 'Processing...' : `Confirm Bulk ${bulkActionMode === 'in' ? 'Receipt' : 'Dispatch'} (${selectedTools.length})`}
-              </Button>
-              <Button variant="outline" onClick={() => setBulkActionMode(null)} disabled={bulkSubmitting}>
-                Cancel
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* QR Scanner */}
       <Card>

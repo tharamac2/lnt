@@ -4,6 +4,7 @@ from sqlmodel import Session, select
 from ..database import get_session
 from ..models import Tool, ToolCreate, ToolRead, ToolUpdate, User
 from ..auth import get_current_user
+from ..audit import log_action
 
 router = APIRouter(prefix="/tools", tags=["tools"])
 
@@ -35,8 +36,14 @@ def create_tool(tool: ToolCreate, session: Session = Depends(get_session), curre
         site=db_tool.current_site,
     )
     session.add(new_alert)
+
+    log_action(
+        session, current_user, "create", "Tool", db_tool.id,
+        f"Created tool {db_tool.description} ({db_tool.qr_code})",
+        site=db_tool.current_site,
+    )
     session.commit()
-    
+
     return db_tool
 
 @router.get("/sites/", response_model=List[str])
@@ -99,14 +106,17 @@ def update_tool(tool_id: int, tool_update: ToolUpdate, session: Session = Depend
         raise HTTPException(status_code=404, detail="Tool not found")
     
     old_site = db_tool.current_site
+    old_subcontractor = db_tool.subcontractor_name
 
     tool_data = tool_update.dict(exclude_unset=True)
     for key, value in tool_data.items():
         setattr(db_tool, key, value)
-    
+
     # Check for site movement and record history
-    if "current_site" in tool_data: 
+    moved = False
+    if "current_site" in tool_data:
         if old_site != tool_data["current_site"]:
+            moved = True
             from ..models import MovementHistory
             # Create history record
             history = MovementHistory(
@@ -117,11 +127,51 @@ def update_tool(tool_id: int, tool_update: ToolUpdate, session: Session = Depend
                 user_id=current_user.id
             )
             session.add(history)
-    
+
+            log_action(
+                session, current_user, "movement", "Tool", db_tool.id,
+                f"Moved tool {db_tool.description} ({db_tool.qr_code}) from {old_site or '-'} to {db_tool.current_site or '-'}",
+                site=db_tool.current_site,
+            )
+
+    # If the site itself didn't change, a sub-contractor issue/return is still a
+    # movement out of / into the store and should appear in movement history.
+    if not moved and "subcontractor_name" in tool_data:
+        new_subcontractor = tool_data["subcontractor_name"]
+        from ..models import MovementHistory
+        if new_subcontractor and new_subcontractor != old_subcontractor:
+            history = MovementHistory(
+                tool_id=db_tool.id,
+                from_site=old_site,
+                to_site=f"Sub-Contractor: {new_subcontractor}",
+                remarks=tool_data.get("remarks"),
+                user_id=current_user.id
+            )
+            session.add(history)
+            log_action(
+                session, current_user, "movement", "Tool", db_tool.id,
+                f"Issued tool {db_tool.description} ({db_tool.qr_code}) to Sub-Contractor {new_subcontractor}",
+                site=db_tool.current_site,
+            )
+        elif old_subcontractor and not new_subcontractor:
+            history = MovementHistory(
+                tool_id=db_tool.id,
+                from_site=f"Sub-Contractor: {old_subcontractor}",
+                to_site=db_tool.current_site,
+                remarks=tool_data.get("remarks"),
+                user_id=current_user.id
+            )
+            session.add(history)
+            log_action(
+                session, current_user, "movement", "Tool", db_tool.id,
+                f"Returned tool {db_tool.description} ({db_tool.qr_code}) from Sub-Contractor {old_subcontractor}",
+                site=db_tool.current_site,
+            )
+
     session.add(db_tool)
     session.commit()
     session.refresh(db_tool)
-    
+
     # Generate Info Alert for Update
     from ..models import Alert
     update_alert = Alert(
@@ -133,6 +183,14 @@ def update_tool(tool_id: int, tool_update: ToolUpdate, session: Session = Depend
         site=db_tool.current_site,
     )
     session.add(update_alert)
+
+    changed_fields = ", ".join(k for k in tool_data.keys() if k != "current_site") or "site"
+    if not moved or len(tool_data) > 1:
+        log_action(
+            session, current_user, "update", "Tool", db_tool.id,
+            f"Updated tool {db_tool.description} ({db_tool.qr_code}) - fields: {changed_fields}",
+            site=db_tool.current_site,
+        )
     session.commit()
     
     return db_tool
@@ -170,6 +228,12 @@ def delete_tool(tool_id: int, session: Session = Depends(get_session), current_u
         site=tool.current_site,
     )
     session.add(del_alert)
+
+    log_action(
+        session, current_user, "delete", "Tool", tool_id,
+        f"Deleted tool {tool.description} ({tool.qr_code})",
+        site=tool.current_site,
+    )
 
     session.delete(tool)
     session.commit()

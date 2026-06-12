@@ -9,7 +9,12 @@ import LoginPage from "./pages/LoginPage";
 import Layout from "./components/Layout";
 import ToolMaster from "./pages/ToolMaster";
 import StoreView from "./pages/StoreView";
+import StoreInventory from "./pages/StoreInventory";
+import ToolsMovements from "./pages/ToolsMovements";
+import ToolsMovementHistory from "./pages/ToolsMovementHistory";
 import InspectorView from "./pages/InspectorView";
+import InspectionResults from "./pages/InspectionResults";
+import InspectorEmployeeProfile from "./pages/InspectorEmployeeProfile";
 import Dashboard from "./pages/Dashboard";
 import WorkerView from "./pages/WorkerView";
 import SplitToolMatching from "./pages/SplitToolMatching";
@@ -17,6 +22,8 @@ import Reports from "./pages/Reports";
 import Alerts from "./pages/Alerts";
 import UsersManagement from "./pages/UsersManagement";
 import SettingsPage from "./pages/SettingsPage";
+import AuditLog from "./pages/AuditLog";
+import InspectionEmployees from "./pages/InspectionEmployees";
 import ViewTool from "./pages/ViewTool";
 import SplashScreen from "./components/SplashScreen";
 import { Toaster } from "./components/ui/sonner";
@@ -30,6 +37,7 @@ export interface User {
   | "admin"
   | "store"
   | "inspector"
+  | "inspection_employee"
   | "management"
   | "worker"
   | "data_entry";
@@ -46,13 +54,13 @@ function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
     setUser(null);
   };
 
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       if (token) {
         try {
           const response = await api.get('/users/me');
@@ -66,7 +74,7 @@ function App() {
           });
         } catch (error) {
           console.error("Session restoration failed", error);
-          localStorage.removeItem('token');
+          sessionStorage.removeItem('token');
         }
       }
       setAuthChecked(true);
@@ -110,6 +118,8 @@ function App() {
               <Route path="/reports" element={<Reports />} />
               <Route path="/alerts" element={<Alerts />} />
               <Route path="/users" element={<UsersManagement />} />
+              <Route path="/audit-log" element={<AuditLog />} />
+              <Route path="/inspection-employees" element={<InspectionEmployees />} />
               <Route path="/settings" element={<SettingsPage />} />
             </>
           )}
@@ -119,6 +129,9 @@ function App() {
             <>
               <Route path="/" element={<Navigate to="/store-view" replace />} />
               <Route path="/store-view" element={<StoreView />} />
+              <Route path="/store-inventory" element={<StoreInventory />} />
+              <Route path="/tools-movements" element={<ToolsMovements />} />
+              <Route path="/tools-movement-history" element={<ToolsMovementHistory />} />
             </>
           )}
 
@@ -127,6 +140,17 @@ function App() {
             <>
               <Route path="/" element={<Navigate to="/inspector" replace />} />
               <Route path="/inspector" element={<InspectorView />} />
+              <Route path="/inspector/results" element={<InspectionResults />} />
+              <Route path="/inspector/add-employee" element={<InspectorEmployeeProfile />} />
+            </>
+          )}
+
+          {/* -- Inspection Employee -- */}
+          {user.role === "inspection_employee" && (
+            <>
+              <Route path="/" element={<Navigate to="/inspector" replace />} />
+              <Route path="/inspector" element={<InspectorView />} />
+              <Route path="/inspector/results" element={<InspectionResults />} />
             </>
           )}
 

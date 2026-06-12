@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Separator } from '../components/ui/separator';
 import { QRCodeCanvas } from 'qrcode.react';
-import { Download, Printer, Save, Edit, Search, FileDown, History, UploadCloud, X, Activity, Trash2 } from 'lucide-react';
+import { Download, Printer, Save, Edit, Search, FileDown, History, UploadCloud, X, Activity, Trash2, FileSpreadsheet } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
+import { Checkbox } from '../components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,11 @@ import {
 import { toast } from 'sonner';
 import { DatePicker } from '../components/ui/date-picker';
 import { Html5Qrcode } from 'html5-qrcode';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
+import ltLogo from '../../assets/lt-logo.png';
 import {
   Table,
   TableBody,
@@ -189,6 +195,161 @@ const ToolMaster = ({ user }: { user?: User }) => {
 
     return matchesSearch && matchesStatus && matchesCreator;
   });
+
+  // Bulk selection for Existing Inventory table
+  const [selectedToolIds, setSelectedToolIds] = useState<Set<number>>(new Set());
+
+  const toggleToolSelection = (toolId: number) => {
+    setSelectedToolIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(toolId)) {
+        next.delete(toolId);
+      } else {
+        next.add(toolId);
+      }
+      return next;
+    });
+  };
+
+  const allFilteredSelected = filteredTools.length > 0 &&
+    filteredTools.every((tool) => selectedToolIds.has(tool.id));
+
+  const toggleSelectAll = () => {
+    setSelectedToolIds((prev) => {
+      if (allFilteredSelected) {
+        const next = new Set(prev);
+        filteredTools.forEach((tool) => next.delete(tool.id));
+        return next;
+      }
+      const next = new Set(prev);
+      filteredTools.forEach((tool) => next.add(tool.id));
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedToolIds(new Set());
+
+  const selectedTools = useMemo(
+    () => filteredTools.filter((tool) => selectedToolIds.has(tool.id)),
+    [filteredTools, selectedToolIds]
+  );
+
+  const exportTools = selectedTools.length > 0 ? selectedTools : filteredTools;
+
+  const getLogoDataUrl = async (): Promise<string> => {
+    const response = await fetch(ltLogo);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  const exportInventoryPDF = async () => {
+    if (exportTools.length === 0) return;
+
+    const doc = new jsPDF('landscape');
+    try {
+      const logoData = await getLogoDataUrl();
+      // Logo is 347x100px (~3.47:1) - keep aspect ratio
+      doc.addImage(logoData, 'PNG', 14, 8, 30, 8.6);
+    } catch (e) {
+      console.warn('Could not load logo for PDF', e);
+    }
+
+    doc.setFontSize(16);
+    doc.setTextColor(30, 58, 138);
+    doc.text('Tool Master - Existing Inventory', 50, 14);
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 50, 21);
+
+    autoTable(doc, {
+      head: [['Tool Name', 'QR Code', 'Make', 'Capacity', 'Current Site', 'Status', 'View Tool']],
+      body: exportTools.map((tool) => [
+        tool.description,
+        tool.qr_code,
+        tool.make,
+        tool.capacity,
+        tool.current_site || '-',
+        tool.status,
+        `${baseUrl}/view-tool/${tool.qr_code}`,
+      ]),
+      startY: 34,
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [30, 58, 138] },
+      columnStyles: { 6: { textColor: [30, 58, 138] } },
+    });
+
+    doc.save(`Tool_Master_Inventory_${Date.now()}.pdf`);
+    toast.success(`Exported ${exportTools.length} item(s) to PDF`);
+  };
+
+  const exportInventoryExcel = async () => {
+    if (exportTools.length === 0) return;
+
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Inventory');
+
+      const headers = ['Tool Name', 'QR Code', 'Make', 'Capacity', 'Current Site', 'Status', 'View Tool'];
+
+      // Row 1: title
+      const headerRow = worksheet.addRow(['Tool Master - Existing Inventory']);
+      headerRow.getCell(1).font = { bold: true, size: 14, color: { argb: 'FF1E3A8A' } };
+
+      // Row 2: generated date
+      const subRow = worksheet.addRow([`Generated: ${new Date().toLocaleString()}`]);
+      subRow.getCell(1).font = { italic: true, size: 9, color: { argb: 'FF666666' } };
+
+      // Row 3: spacer
+      worksheet.addRow([]);
+
+      // Row 4: column headers
+      const colHeaderRow = worksheet.addRow(headers);
+      colHeaderRow.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = {
+          top: { style: 'thin' }, left: { style: 'thin' },
+          bottom: { style: 'thin' }, right: { style: 'thin' },
+        };
+      });
+
+      exportTools.forEach((tool) => {
+        const viewToolUrl = `${baseUrl}/view-tool/${tool.qr_code}`;
+        const row = worksheet.addRow([
+          tool.description,
+          tool.qr_code,
+          tool.make,
+          tool.capacity,
+          tool.current_site || '-',
+          tool.status,
+          viewToolUrl,
+        ]);
+        const linkCell = row.getCell(7);
+        linkCell.value = { text: viewToolUrl, hyperlink: viewToolUrl };
+        linkCell.font = { color: { argb: 'FF1E3A8A' }, underline: true };
+      });
+
+      worksheet.columns.forEach((column) => {
+        column.width = 24;
+        column.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `Tool_Master_Inventory_${Date.now()}.xlsx`);
+      toast.success(`Exported ${exportTools.length} item(s) to Excel`);
+    } catch (e) {
+      console.error('Failed to export Excel', e);
+      toast.error('Failed to export Excel');
+    }
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setToolData(prev => ({ ...prev, [field]: value }));
@@ -1176,12 +1337,50 @@ const ToolMaster = ({ user }: { user?: User }) => {
                 </Select>
               </div>
             )}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="border-[#1E3A8A] text-[#1E3A8A] hover:bg-blue-50"
+                onClick={exportInventoryPDF}
+                disabled={filteredTools.length === 0}
+              >
+                <FileDown className="w-4 h-4 mr-2" />
+                Export PDF
+              </Button>
+              <Button
+                className="bg-[#1E3A8A] hover:bg-[#1E3A8A]/90"
+                onClick={exportInventoryExcel}
+                disabled={filteredTools.length === 0}
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Export Excel
+              </Button>
+            </div>
           </div>
 
-          <div className="rounded-md border bg-white shadow-sm overflow-hidden">
-            <Table>
-              <TableHeader className="bg-gray-50">
+          {selectedToolIds.size > 0 && (
+            <div className="sticky top-16 z-20 px-3 py-2 border border-blue-100 rounded-md bg-blue-50 flex items-center justify-between gap-2 flex-wrap shadow-sm">
+              <span className="text-sm text-blue-800 font-medium">
+                {selectedToolIds.size} item{selectedToolIds.size === 1 ? '' : 's'} selected
+              </span>
+              <Button size="sm" variant="ghost" className="h-8 text-gray-500" onClick={clearSelection}>
+                <X className="w-3.5 h-3.5 mr-1.5" />
+                Clear
+              </Button>
+            </div>
+          )}
+
+          <div className="rounded-md border bg-white shadow-sm overflow-auto max-h-[500px] [&>div]:overflow-visible">
+            <Table className="border-separate border-spacing-0">
+              <TableHeader className="sticky top-0 z-10 shadow-sm [&_th]:bg-gray-50">
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={allFilteredSelected}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
                   <TableHead>Tool Name</TableHead>
                   <TableHead>QR Code</TableHead>
                   <TableHead>Make</TableHead>
@@ -1197,6 +1396,13 @@ const ToolMaster = ({ user }: { user?: User }) => {
                 {filteredTools.length > 0 ? (
                   filteredTools.map((tool) => (
                     <TableRow key={tool.id} className="hover:bg-gray-50/50">
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedToolIds.has(tool.id)}
+                          onCheckedChange={() => toggleToolSelection(tool.id)}
+                          aria-label={`Select ${tool.description}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium text-[#1E3A8A]">
                         <span
                           className="cursor-pointer underline decoration-dotted underline-offset-4 decoration-gray-400 hover:text-blue-700 hover:decoration-blue-700 transition-colors"
@@ -1292,7 +1498,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={user?.role === 'admin' ? 9 : 8} className="h-24 text-center">
+                    <TableCell colSpan={user?.role === 'admin' ? 10 : 9} className="h-24 text-center">
                       No tools found matching your criteria.
                     </TableCell>
                   </TableRow>

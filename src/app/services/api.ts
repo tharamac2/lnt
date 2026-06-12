@@ -15,7 +15,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -27,7 +27,7 @@ api.interceptors.response.use(
   (error) => {
     const isAuthEndpoint = typeof error.config?.url === 'string' && error.config.url.includes('/users/token');
     if (error.response?.status === 401 && !isAuthEndpoint) {
-      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
       // Ideally redirect to login, but let's let the App component handle it via state
       window.location.href = '/';
     }

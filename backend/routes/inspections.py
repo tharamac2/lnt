@@ -3,17 +3,41 @@ from typing import List
 from sqlmodel import Session, select
 from sqlalchemy.orm import joinedload
 from ..database import get_session
-from ..models import Inspection, InspectionCreate, InspectionRead, InspectionReadWithTool, User, Tool
+from ..models import Inspection, InspectionCreate, InspectionRead, InspectionReadWithTool, User, Tool, Inspector
 from ..auth import get_current_user
+from ..audit import log_action
 
 router = APIRouter(prefix="/inspections", tags=["inspections"])
 
 @router.post("/", response_model=InspectionRead)
-def create_inspection(inspection: InspectionCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    # Create inspection dictionary from input, excluding defaults if needed, 
+def create_inspection(inspection: InspectionCreate, session: Session = Depends(get_session), current_user = Depends(get_current_user)):
+    if isinstance(current_user, Inspector):
+        if current_user.status != "verified":
+            raise HTTPException(
+                status_code=403,
+                detail="Your employee profile must be verified by an admin before you can submit inspections.",
+            )
+        inspector_id_for_record = current_user.created_by_id
+    elif current_user.role == "inspector":
+        verified = session.exec(
+            select(Inspector).where(
+                Inspector.created_by_id == current_user.id,
+                Inspector.status == "verified",
+            )
+        ).first()
+        if not verified:
+            raise HTTPException(
+                status_code=403,
+                detail="Your employee profile must be verified by an admin before you can submit inspections.",
+            )
+        inspector_id_for_record = current_user.id
+    else:
+        inspector_id_for_record = current_user.id
+
+    # Create inspection dictionary from input, excluding defaults if needed,
     # but specifically handle inspector_id which comes from current_user
     inspection_data = inspection.dict(exclude_unset=True)
-    inspection_data['inspector_id'] = current_user.id
+    inspection_data['inspector_id'] = inspector_id_for_record
     
     # Create the model instance with the injection inspector_id
     db_inspection = Inspection(**inspection_data) 
@@ -56,7 +80,13 @@ def create_inspection(inspection: InspectionCreate, session: Session = Depends(g
                  site=tool.current_site,
              )
              session.add(crit_alert)
-    
+
+    log_action(
+        session, current_user, "create", "Inspection", db_inspection.id,
+        f"Inspection recorded for tool #{db_inspection.tool_id} - result: {db_inspection.result}",
+        site=tool.current_site if tool else None,
+    )
+
     session.commit()
     session.refresh(db_inspection)
     return db_inspection
@@ -65,6 +95,24 @@ def create_inspection(inspection: InspectionCreate, session: Session = Depends(g
 def read_inspections_by_tool(tool_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
     statement = select(Inspection).where(Inspection.tool_id == tool_id)
     inspections = session.exec(statement).all()
+    return inspections
+
+@router.get("/results", response_model=List[InspectionReadWithTool])
+def read_inspection_results(
+    limit: int = 200,
+    session: Session = Depends(get_session),
+    current_user = Depends(get_current_user)
+):
+    if isinstance(current_user, Inspector):
+        site = current_user.creator.site if current_user.creator else None
+    else:
+        site = current_user.site
+
+    statement = select(Inspection).options(joinedload(Inspection.tool), joinedload(Inspection.inspector))
+    if site:
+        statement = statement.join(Tool).where(Tool.current_site == site)
+    statement = statement.order_by(Inspection.date.desc()).limit(limit)
+    inspections = session.exec(statement).unique().all()
     return inspections
 
 @router.get("/", response_model=List[InspectionReadWithTool])

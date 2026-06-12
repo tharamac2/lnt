@@ -20,6 +20,7 @@ interface User {
   site: string;
   status: 'active' | 'inactive';
   lastLogin: string;
+  isInspectionEmployee?: boolean;
 }
 
 import { useEffect } from 'react';
@@ -52,7 +53,26 @@ const UsersManagement = () => {
           status: u.status,
           lastLogin: new Date().toISOString()
         }));
-        setUsers(fetchedUsers);
+
+        let inspectionEmployees: User[] = [];
+        try {
+          const empRes = await api.get('/inspectors/');
+          inspectionEmployees = empRes.data.map((emp: any) => ({
+            id: `insp-${emp.id}`,
+            name: emp.name,
+            email: emp.email,
+            phone: emp.contact_number || 'N/A',
+            role: 'inspection_employee',
+            site: emp.site || 'N/A',
+            status: emp.status === 'verified' ? 'active' : 'inactive',
+            lastLogin: emp.created_at,
+            isInspectionEmployee: true,
+          }));
+        } catch (err) {
+          console.error("Failed to fetch inspection employees", err);
+        }
+
+        setUsers([...fetchedUsers, ...inspectionEmployees]);
       } catch (error) {
         console.error("Failed to fetch users", error);
         toast.error("Failed to load users");
@@ -315,7 +335,11 @@ const UsersManagement = () => {
     if (!window.confirm("Are you sure you want to delete this user?")) return;
 
     try {
-      await api.delete(`/users/${userId}`);
+      if (userId.startsWith('insp-')) {
+        await api.delete(`/inspectors/${userId.replace('insp-', '')}`);
+      } else {
+        await api.delete(`/users/${userId}`);
+      }
       setUsers(users.filter(u => u.id !== userId));
       toast.success('User deleted successfully');
     } catch (error) {
@@ -327,8 +351,22 @@ const UsersManagement = () => {
   const toggleUserStatus = async (userId: string) => {
     const userToToggle = users.find(u => u.id === userId);
     if (!userToToggle) return;
-    
+
     const newStatus = userToToggle.status === 'active' ? 'inactive' : 'active';
+
+    if (userToToggle.isInspectionEmployee) {
+      const inspectorId = userId.replace('insp-', '');
+      try {
+        await api.patch(`/inspectors/${inspectorId}/${newStatus === 'active' ? 'verify' : 'unverify'}`);
+        setUsers(users.map(u => (u.id === userId ? { ...u, status: newStatus } : u)));
+        toast.success('Employee verification status updated');
+      } catch (error) {
+        console.error("Failed to update employee status", error);
+        toast.error('Failed to update employee status');
+      }
+      return;
+    }
+
     try {
       await api.patch(`/users/${userId}`, { status: newStatus });
       setUsers(users.map(u =>
@@ -355,6 +393,8 @@ const UsersManagement = () => {
         return <Badge className="bg-gray-600">Worker</Badge>;
       case 'data_entry':
         return <Badge className="bg-teal-600">Data Entry</Badge>;
+      case 'inspection_employee':
+        return <Badge className="bg-emerald-600">Inspection Employee</Badge>;
       default:
         return <Badge variant="secondary">{role}</Badge>;
     }
@@ -747,14 +787,17 @@ const UsersManagement = () => {
                     <Switch
                       checked={user.status === 'active'}
                       onCheckedChange={() => toggleUserStatus(user.id)}
+                      title={user.isInspectionEmployee ? (user.status === 'active' ? 'Verified - click to unverify' : 'Pending - click to verify') : undefined}
                     />
                   </TableCell>
                   <TableCell>{new Date(user.lastLogin).toLocaleDateString()}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="ghost" onClick={() => handleEditClick(user)}>
-                        <Edit className="w-4 h-4" />
-                      </Button>
+                      {!user.isInspectionEmployee && (
+                        <Button size="sm" variant="ghost" onClick={() => handleEditClick(user)}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"

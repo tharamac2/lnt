@@ -167,3 +167,57 @@ class MovementHistoryRead(MovementHistoryBase):
     id: int
     user: Optional[UserRead] = None
     tool: Optional[ToolRead] = None
+
+class AuditLogBase(SQLModel):
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    username: Optional[str] = None
+    action: str  # create, update, delete, login
+    entity_type: str  # Tool, User, Inspection, Movement
+    entity_id: Optional[int] = None
+    description: str
+    site: Optional[str] = None
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+class AuditLog(AuditLogBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+class AuditLogRead(AuditLogBase):
+    id: int
+
+class InspectorBase(SQLModel):
+    name: str
+    employee_id: str = Field(index=True, unique=True)
+    email: str = Field(index=True, unique=True)
+    designation: Optional[str] = None
+    department: Optional[str] = None
+    contact_number: Optional[str] = None
+    status: str = "pending"  # pending, verified
+    role: str = "inspection_employee"
+    created_by_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    created_at: datetime = Field(default_factory=datetime.now)
+
+class Inspector(InspectorBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    hashed_password: str
+    creator: Optional["User"] = Relationship()
+
+class InspectorCreate(SQLModel):
+    name: str
+    employee_id: str
+    email: str
+    password: str
+    designation: Optional[str] = None
+    department: Optional[str] = None
+    contact_number: Optional[str] = None
+
+class InspectorRead(InspectorBase):
+    id: int
+
+class InspectorUpdate(SQLModel):
+    name: Optional[str] = None
+    employee_id: Optional[str] = None
+    email: Optional[str] = None
+    designation: Optional[str] = None
+    department: Optional[str] = None
+    contact_number: Optional[str] = None
+    status: Optional[str] = None

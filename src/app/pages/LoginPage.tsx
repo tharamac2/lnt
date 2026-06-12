@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { User } from '../App';
-import { QrCode, Shield, Store, HardHat, UserCog, ArrowLeft, Camera, Eye, EyeOff } from 'lucide-react';
+import { QrCode, Shield, Store, HardHat, UserCog, ArrowLeft, Camera, Eye, EyeOff, ClipboardCheck } from 'lucide-react';
 import api from '../services/api';
 import { toast } from 'sonner';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -25,11 +25,6 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
   const [scanning, setScanning] = useState(false);
   const [scannedQr, setScannedQr] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-
-  // --- Login OTP state ---
-  const [otpRequired, setOtpRequired] = useState(false);
-  const [loginOtp, setLoginOtp] = useState('');
-  const [otpEmail, setOtpEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const handleRoleSelect = (role: string) => {
@@ -37,8 +32,8 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
       handleWorkerAccess();
     } else {
       setSelectedRole(role);
-      if (role === 'store' || role === 'inspector' || role === 'data_entry') {
-        setUsername(''); // Do not auto-fill for store and inspector
+      if (role === 'store' || role === 'inspector' || role === 'data_entry' || role === 'inspection_employee') {
+        setUsername(''); // Do not auto-fill for store, inspector and inspection employee
       } else {
         setUsername(role); // Auto-fill username based on role for simplicity in this flow
       }
@@ -51,9 +46,6 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
     setUsername('');
     setPassword('');
     setScannedQr(null);
-    setOtpRequired(false);
-    setLoginOtp('');
-    setOtpEmail('');
   };
 
   const handleNavigation = (role: string, extraState = {}) => {
@@ -68,6 +60,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
         }
         break;
       case 'inspector':
+      case 'inspection_employee':
         navigate('/inspector');
         break;
       case 'store':
@@ -117,40 +110,6 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       });
 
-      if (response.data.otp_required) {
-        setOtpRequired(true);
-        setOtpEmail(response.data.email);
-        toast.success(`Verification code sent to ${response.data.email}`);
-        return;
-      }
-    } catch (error: any) {
-      console.error('Login failed', error);
-      if (error.response && error.response.data && error.response.data.detail) {
-        toast.error(error.response.data.detail);
-      } else if (error.response && error.response.status === 401) {
-        toast.error('No users found. Please check your credentials.');
-      } else if (error.message === "Network Error" || !error.response) {
-        toast.error('Server is unreachable. Please try again later.');
-      } else {
-        toast.error('Login failed. Please try again.');
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleVerifyLoginOtp = async () => {
-    if (!loginOtp.trim()) {
-      toast.error('Please enter the verification code');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const response = await api.post('/users/token/verify-otp', {
-        username: username.trim(),
-        otp: loginOtp.trim(),
-      });
-
       const { access_token, role } = response.data;
 
       // Role enforcement: Check if the user's role matches the selected portal
@@ -160,7 +119,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
         return;
       }
 
-      localStorage.setItem('token', access_token);
+      sessionStorage.setItem('token', access_token);
 
       // Fetch full profile from backend to guarantee latest fields (name, site)
       const profileRes = await api.get('/users/me');
@@ -177,11 +136,15 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
       toast.success('Login successful');
       handleNavigation(role, scannedQr ? { qrCode: scannedQr } : {});
     } catch (error: any) {
-      console.error('OTP verification failed', error);
+      console.error('Login failed', error);
       if (error.response && error.response.data && error.response.data.detail) {
         toast.error(error.response.data.detail);
+      } else if (error.response && error.response.status === 401) {
+        toast.error('No users found. Please check your credentials.');
+      } else if (error.message === "Network Error" || !error.response) {
+        toast.error('Server is unreachable. Please try again later.');
       } else {
-        toast.error('Verification failed. Please try again.');
+        toast.error('Login failed. Please try again.');
       }
     } finally {
       setSubmitting(false);
@@ -221,6 +184,13 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
       description: 'Verify condition & safety',
       icon: Shield,
       color: 'bg-green-50 text-green-600'
+    },
+    {
+      id: 'inspection_employee',
+      title: 'Inspection Employee',
+      description: 'Perform tool inspections',
+      icon: ClipboardCheck,
+      color: 'bg-emerald-50 text-emerald-600'
     },
     { // Added Management Role to cards
       id: 'management',
@@ -333,7 +303,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                     return <Icon className="w-6 h-6 text-blue-400" />;
                   })()}
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-1 tracking-tight capitalize">{selectedRole === 'inspector' ? 'Inspection' : selectedRole} Portal</h2>
+                <h2 className="text-2xl font-bold text-white mb-1 tracking-tight capitalize">{selectedRole === 'inspector' ? 'Inspection' : selectedRole === 'inspection_employee' ? 'Inspection Employee' : selectedRole} Portal</h2>
                 <p className="text-neutral-400 text-sm font-medium">Authenticate your session</p>
               </div>
 
@@ -383,7 +353,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                   </div>
                 )}
 
-                {(selectedRole === 'store' || selectedRole === 'inspector' || selectedRole === 'data_entry') && (
+                {(selectedRole === 'store' || selectedRole === 'inspector' || selectedRole === 'data_entry' || selectedRole === 'inspection_employee') && (
                   <div className="space-y-2">
                     <Label htmlFor="username" className="text-xs font-bold text-neutral-400 uppercase tracking-wider block">User ID / Mail ID</Label>
                     <div className="relative">
@@ -397,7 +367,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         className="h-12 w-full pl-10 pr-3 rounded-xl border-white/10 bg-black/40 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm shadow-inner transition-all text-white placeholder:text-neutral-600"
-                        autoFocus={selectedRole === 'store' || selectedRole === 'inspector' || selectedRole === 'data_entry'}
+                        autoFocus={selectedRole === 'store' || selectedRole === 'inspector' || selectedRole === 'data_entry' || selectedRole === 'inspection_employee'}
                       />
                     </div>
                   </div>
@@ -415,10 +385,9 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                       placeholder="Enter password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && !otpRequired && handleLogin()}
+                      onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
                       className="h-12 w-full pl-10 pr-10 rounded-xl border-white/10 bg-black/40 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm shadow-inner transition-all text-white placeholder:text-neutral-600"
-                      autoFocus={selectedRole !== 'store' && selectedRole !== 'inspector'}
-                      disabled={otpRequired}
+                      autoFocus={selectedRole !== 'store' && selectedRole !== 'inspector' && selectedRole !== 'data_entry' && selectedRole !== 'inspection_employee'}
                     />
                     <button
                       type="button"
@@ -430,38 +399,13 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                   </div>
                 </div>
 
-                {otpRequired && (
-                  <div className="space-y-2">
-                    <Label htmlFor="login-otp" className="text-xs font-bold text-neutral-400 uppercase tracking-wider block">Verification Code</Label>
-                    <Input
-                      id="login-otp"
-                      type="text"
-                      placeholder={`Enter the code sent to ${otpEmail}`}
-                      value={loginOtp}
-                      onChange={(e) => setLoginOtp(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleVerifyLoginOtp()}
-                      maxLength={6}
-                      className="h-12 w-full px-3 rounded-xl border-white/10 bg-black/40 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm shadow-inner transition-all text-white placeholder:text-neutral-600"
-                      autoFocus
-                    />
-                    <p className="text-xs text-neutral-500">A verification code was sent to {otpEmail}.</p>
-                    <button
-                      type="button"
-                      onClick={() => { setOtpRequired(false); setLoginOtp(''); }}
-                      className="text-xs text-blue-400 hover:text-blue-300 font-medium"
-                    >
-                      &larr; Use a different account
-                    </button>
-                  </div>
-                )}
-
                 <div className="pt-4">
                   <Button
                     className="w-full h-12 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.23)] hover:-translate-y-0.5 transition-all duration-200"
-                    onClick={otpRequired ? handleVerifyLoginOtp : handleLogin}
+                    onClick={handleLogin}
                     disabled={submitting}
                   >
-                    {submitting ? 'Please wait...' : otpRequired ? 'Verify & Sign In' : 'Sign In'}
+                    {submitting ? 'Please wait...' : 'Sign In'}
                   </Button>
                 </div>
               </div>

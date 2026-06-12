@@ -6,7 +6,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlmodel import Session, select
 from .database import get_session
-from .models import User
+from .models import User, Inspector
 
 # Change this to a secure secret key in production
 SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
@@ -45,7 +45,14 @@ async def get_current_user(token: str = Depends(oauth2_scheme), session: Session
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    
+
+    if payload.get("type") == "inspector":
+        statement = select(Inspector).where(Inspector.email == username)
+        inspector = session.exec(statement).first()
+        if inspector is None:
+            raise credentials_exception
+        return inspector
+
     statement = select(User).where(User.username == username)
     user = session.exec(statement).first()
     if user is None:
