@@ -48,6 +48,13 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     statement = select(Inspector).where(Inspector.email == form_data.username)
     inspector = session.exec(statement).first()
     if inspector and verify_password(form_data.password, inspector.hashed_password):
+        if inspector.status != "verified":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account is deactivated. Please contact an administrator.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
             data={"sub": inspector.email, "role": "inspection_employee", "type": "inspector"},
