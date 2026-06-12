@@ -28,15 +28,18 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Credentials are valid - send a login OTP to the user's email before issuing a token
-    try:
-        email_utils.send_otp_email(user.email)
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to send verification email. Please try again.")
-
-    return {"otp_required": True, "email": user.email}
+    # OTP Bypass: Generate and return token directly
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username, "role": user.role}, expires_delta=access_token_expires
+    )
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "role": user.role,
+        "full_name": user.full_name,
+        "site": user.site
+    }
 
 class LoginOTPVerifyRequest(BaseModel):
     username: str

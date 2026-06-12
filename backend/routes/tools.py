@@ -68,7 +68,7 @@ def read_tools(
     session: Session = Depends(get_session), 
     current_user: User = Depends(get_current_user)
 ):
-    query = select(Tool)
+    query = select(Tool).where(Tool.is_deleted == False)
     
     # Filtering for Data Entry role: show only their assigned site
     if current_user.role == "data_entry" and current_user.site:
@@ -84,6 +84,31 @@ def read_tools(
     
     tools = session.exec(query.offset(offset).limit(limit)).all()
     return tools
+
+from pydantic import BaseModel
+class MarkPrintedRequest(BaseModel):
+    tool_ids: List[int]
+
+@router.post("/mark-printed")
+def mark_tools_printed(payload: MarkPrintedRequest, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    tools = session.exec(select(Tool).where(Tool.id.in_(payload.tool_ids))).all()
+    for tool in tools:
+        tool.is_printed = True
+        session.add(tool)
+    session.commit()
+    return {"ok": True, "count": len(tools)}
+
+@router.get("/deleted-stats")
+def get_deleted_stats(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    # Returns the list of deleted tools that were printed
+    query = select(Tool).where(Tool.is_deleted == True, Tool.is_printed == True)
+    if current_user.role == "data_entry" and current_user.site:
+        query = query.where(Tool.current_site == current_user.site)
+    deleted_tools = session.exec(query).all()
+    return {
+        "count": len(deleted_tools),
+        "tools": deleted_tools
+    }
 
 @router.get("/{tool_id}", response_model=ToolRead)
 def read_tool(tool_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
@@ -144,20 +169,86 @@ def delete_tool(tool_id: int, session: Session = Depends(get_session), current_u
     if not tool:
         raise HTTPException(status_code=404, detail="Tool not found")
 
-    # Nullify tool_id on existing alerts so they are preserved as history
-    existing_alerts = session.exec(select(Alert).where(Alert.tool_id == tool_id)).all()
-    for alert in existing_alerts:
-        alert.tool_id = None
-        session.add(alert)
+    is_printed = tool.is_printed
+    deleted_qr_code = tool.qr_code
+    deleted_created_at = tool.created_at
 
-    # Delete related inspections and movement history
-    inspections = session.exec(select(Inspection).where(Inspection.tool_id == tool_id)).all()
-    for ins in inspections:
-        session.delete(ins)
+    if is_printed:
+        # Soft delete
+        tool.is_deleted = True
+        session.add(tool)
+    else:
+        # Hard delete
+        # Nullify tool_id on existing alerts so they are preserved as history
+        existing_alerts = session.exec(select(Alert).where(Alert.tool_id == tool_id)).all()
+        for alert in existing_alerts:
+            alert.tool_id = None
+            session.add(alert)
 
-    movements = session.exec(select(MovementHistory).where(MovementHistory.tool_id == tool_id)).all()
-    for mov in movements:
-        session.delete(mov)
+        # Delete related inspections and movement history
+        inspections = session.exec(select(Inspection).where(Inspection.tool_id == tool_id)).all()
+        for ins in inspections:
+            session.delete(ins)
+
+        movements = session.exec(select(MovementHistory).where(MovementHistory.tool_id == tool_id)).all()
+        for mov in movements:
+            session.delete(mov)
+
+        session.delete(tool)
+        
+        # Resequence unprinted tools in the same batch (uploaded together)
+        if deleted_qr_code and len(deleted_qr_code) >= 4 and deleted_created_at:
+            try:
+                deleted_serial = int(deleted_qr_code[-4:])
+                
+                # Fetch all tools created in the same batch (within 5 seconds of creation time)
+                # (both active and soft-deleted tools, to avoid reusing printed serial numbers)
+                batch_tools = []
+                # First fetch candidate tools from DB (we filter in python to handle time calculations cleanly)
+                candidates = session.exec(
+                    select(Tool)
+                ).all()
+                for c in candidates:
+                    if c.created_at and abs((c.created_at - deleted_created_at).total_seconds()) <= 5:
+                        batch_tools.append(c)
+                
+                # Identify printed serial numbers in the same batch
+                printed_serials = set()
+                for bt in batch_tools:
+                    if bt.is_printed and bt.qr_code and len(bt.qr_code) >= 4:
+                        bt_suffix = bt.qr_code[-4:]
+                        if bt_suffix.isdigit():
+                            printed_serials.add(int(bt_suffix))
+                
+                # Filter unprinted tools in the same batch that need to be resequenced
+                to_resequence = []
+                for bt in batch_tools:
+                    if not bt.is_printed and bt.qr_code and len(bt.qr_code) >= 4:
+                        bt_suffix = bt.qr_code[-4:]
+                        if bt_suffix.isdigit():
+                            bt_serial = int(bt_suffix)
+                            if bt_serial > deleted_serial:
+                                bt_prefix = bt.qr_code[:-4]
+                                to_resequence.append((bt_serial, bt_prefix, bt))
+                
+                # Sort ascending by current serial
+                to_resequence.sort(key=lambda x: x[0])
+                
+                # Assign new serials skipping printed ones
+                current_serial = deleted_serial
+                for ut_serial, ut_prefix, ut in to_resequence:
+                    while current_serial in printed_serials:
+                        current_serial += 1
+                    
+                    # If the new serial is different, update the tool
+                    if current_serial != ut_serial:
+                        ut.qr_code = f"{ut_prefix}{current_serial:04d}"
+                        session.add(ut)
+                    
+                    # Increment current_serial for the next unprinted tool
+                    current_serial += 1
+            except ValueError:
+                pass # QR code wasn't following the exact integer suffix format
 
     session.flush()
 
@@ -165,15 +256,44 @@ def delete_tool(tool_id: int, session: Session = Depends(get_session), current_u
         type="tool-deleted",
         severity="warning",
         title="Tool Deleted",
-        message=f"Tool {tool.description} ({tool.qr_code}) has been deleted from inventory.",
+        message=f"Tool {tool.description} ({deleted_qr_code}) has been deleted from inventory.",
         tool_id=None,
         site=tool.current_site,
     )
     session.add(del_alert)
 
-    session.delete(tool)
     session.commit()
     return {"ok": True}
+
+@router.post("/{tool_id}/restore")
+def restore_tool(tool_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can restore deleted tools.")
+        
+    tool = session.get(Tool, tool_id)
+    if not tool:
+        raise HTTPException(status_code=404, detail="Tool not found")
+        
+    if not tool.is_deleted:
+        raise HTTPException(status_code=400, detail="Tool is not deleted")
+        
+    tool.is_deleted = False
+    session.add(tool)
+    
+    # Create an Alert to log the restore action
+    from ..models import Alert
+    restore_alert = Alert(
+        type="tool-restored",
+        severity="info",
+        title="Tool Restored",
+        message=f"Tool {tool.description} ({tool.qr_code}) has been restored to inventory.",
+        tool_id=tool.id,
+        site=tool.current_site,
+    )
+    session.add(restore_alert)
+    
+    session.commit()
+    return {"ok": True, "tool": tool}
 
 @router.get("/qr/{qr_code}", response_model=ToolRead)
 def read_tool_by_qr(qr_code: str, session: Session = Depends(get_session)):

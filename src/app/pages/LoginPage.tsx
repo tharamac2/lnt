@@ -123,6 +123,32 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
         toast.success(`Verification code sent to ${response.data.email}`);
         return;
       }
+
+      const { access_token, role } = response.data;
+
+      // Role enforcement: Check if the user's role matches the selected portal
+      // Exception: allow 'admin' to access any portal
+      if (selectedRole && role !== selectedRole && role !== 'admin') {
+        toast.error('Invalid username or password');
+        return;
+      }
+
+      localStorage.setItem('token', access_token);
+
+      // Fetch full profile from backend to guarantee latest fields (name, site)
+      const profileRes = await api.get('/users/me');
+      const profile = profileRes.data;
+
+      const user: User = {
+        id: profile.username || username,
+        name: profile.full_name || profile.username || username,
+        role: profile.role as User['role'],
+        site: profile.site
+      };
+
+      onLogin(user);
+      toast.success('Login successful');
+      handleNavigation(role, scannedQr ? { qrCode: scannedQr } : {});
     } catch (error: any) {
       console.error('Login failed', error);
       if (error.response && error.response.data && error.response.data.detail) {

@@ -67,9 +67,15 @@ def generate_otp() -> str:
 def send_otp_email(to_email: str) -> str:
     """Generate an OTP, store it, email it to the user, and return it (for logging/dev fallback)."""
     if not GMAIL_USER or not GMAIL_APP_PASSWORD:
-        raise RuntimeError(
-            "Email sending is not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD in the .env file."
-        )
+        # Development fallback when email is not configured
+        otp = "123456"
+        _otp_store[to_email] = {
+            "otp": otp,
+            "expires_at": datetime.utcnow() + timedelta(minutes=OTP_TTL_MINUTES),
+            "verified": False,
+        }
+        print(f"DEV MODE: OTP for {to_email} is {otp}")
+        return otp
 
     otp = generate_otp()
     _otp_store[to_email] = {

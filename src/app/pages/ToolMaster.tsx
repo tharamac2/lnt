@@ -159,6 +159,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
   const [editingToolId, setEditingToolId] = useState<number | null>(null);
   const [scanning, setScanning] = useState(false);
   const [isToolSaved, setIsToolSaved] = useState(false);
+  const [selectedToolIds, setSelectedToolIds] = useState<number[]>([]);
 
   // History State
   const [historyTool, setHistoryTool] = useState<any>(null); // The tool currently being viewed
@@ -191,7 +192,23 @@ const ToolMaster = ({ user }: { user?: User }) => {
   });
 
   const handleInputChange = (field: string, value: string) => {
-    setToolData(prev => ({ ...prev, [field]: value }));
+    setToolData(prev => {
+      const updates: any = { [field]: value };
+      
+      // Auto-update expiry date if we change validityPeriod and dateOfSupply is present
+      if (field === 'validityPeriod' && prev.dateOfSupply) {
+        const years = parseInt(value);
+        if (!isNaN(years) && years > 0) {
+          const expiry = new Date(prev.dateOfSupply);
+          expiry.setFullYear(prev.dateOfSupply.getFullYear() + years);
+          updates.expiryDate = expiry;
+        } else if (value === '') {
+          updates.expiryDate = undefined;
+        }
+      }
+      
+      return { ...prev, ...updates };
+    });
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: false }));
     }
@@ -204,10 +221,13 @@ const ToolMaster = ({ user }: { user?: User }) => {
       // Auto-calculate expiry date if dateOfSupply changes
       if (field === 'dateOfSupply' && date) {
         const expiry = new Date(date);
-        expiry.setFullYear(date.getFullYear() + 3);
-        // Ensure accurate date by handling leap years if necessary (JS Date handles this mostly)
+        const years = prev.validityPeriod ? parseInt(prev.validityPeriod) : 3;
+        const validYears = isNaN(years) || years <= 0 ? 3 : years;
+        expiry.setFullYear(date.getFullYear() + validYears);
         updates.expiryDate = expiry;
-        updates.validityPeriod = '3';
+        if (!prev.validityPeriod) {
+          updates.validityPeriod = String(validYears);
+        }
       }
 
       return { ...prev, ...updates };
@@ -514,6 +534,35 @@ const ToolMaster = ({ user }: { user?: User }) => {
       fetchTools();
     } catch (error) {
       toast.error('Failed to delete tool');
+    }
+  };
+
+  const handleMarkPrinted = async () => {
+    if (selectedToolIds.length === 0) {
+      toast.warning('Please select at least one tool to mark as printed.');
+      return;
+    }
+    try {
+      await api.post('/tools/mark-printed', { tool_ids: selectedToolIds });
+      toast.success(`${selectedToolIds.length} tools marked as Printed`);
+      setSelectedToolIds([]);
+      fetchTools();
+    } catch (error) {
+      toast.error('Failed to mark tools as printed');
+    }
+  };
+
+  const toggleToolSelection = (toolId: number) => {
+    setSelectedToolIds(prev => 
+      prev.includes(toolId) ? prev.filter(id => id !== toolId) : [...prev, toolId]
+    );
+  };
+
+  const toggleAllSelection = () => {
+    if (selectedToolIds.length === filteredTools.length) {
+      setSelectedToolIds([]);
+    } else {
+      setSelectedToolIds(filteredTools.map(t => t.id));
     }
   };
 
@@ -954,9 +1003,22 @@ const ToolMaster = ({ user }: { user?: User }) => {
                     <>
                       <div className="space-y-2">
                         <Label htmlFor="validityPeriod">Validity Period (Years)</Label>
-                        <div className="h-10 px-3 py-2 rounded-md border border-input bg-gray-100 text-sm opacity-80 cursor-not-allowed">
-                          {toolData.validityPeriod || 'Automatically calculated'}
-                        </div>
+                        {editingToolId !== null ? (
+                          <Input
+                            id="validityPeriod"
+                            type="number"
+                            min="1"
+                            max="50"
+                            placeholder="Enter Validity Period in Years"
+                            value={toolData.validityPeriod}
+                            onChange={(e) => handleInputChange('validityPeriod', e.target.value)}
+                            className={errors.validityPeriod ? 'border-red-500' : ''}
+                          />
+                        ) : (
+                          <div className="h-10 px-3 py-2 rounded-md border border-input bg-gray-100 text-sm opacity-80 cursor-not-allowed">
+                            {toolData.validityPeriod || 'Automatically calculated'}
+                          </div>
+                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -1030,55 +1092,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
                 </CardContent>
               </Card>
 
-              {/* Inspection Status - Only for Existing Tools (Editing) */}
-              {editingToolId && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Inspection Status</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="lastInspection">Date of Last Inspection</Label>
-                        <DatePicker
-                          date={toolData.lastInspectionDate}
-                          onDateChange={(date) => handleDateChange('lastInspectionDate', date)}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <Label>Inspection Result</Label>
-                      <RadioGroup
-                        value={toolData.inspectionResult}
-                        onValueChange={(value) => handleInputChange('inspectionResult', value)}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="usable" id="usable" />
-                          <Label htmlFor="usable" className="font-normal cursor-pointer">Usable</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="not-usable" id="not-usable" />
-                          <Label htmlFor="not-usable" className="font-normal cursor-pointer">Not Usable</Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-                    {toolData.inspectionResult === 'usable' && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-                        <div className="space-y-2">
-                          <Label htmlFor="usability">Usability Percentage</Label>
-                          <Input
-                            id="usability"
-                            type="number"
-                            placeholder="e.g., 95"
-                            value={toolData.usabilityPercentage}
-                            onChange={(e) => handleInputChange('usabilityPercentage', e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
+
 
 
 
@@ -1162,18 +1176,27 @@ const ToolMaster = ({ user }: { user?: User }) => {
               </Select>
             </div>
             {user?.role === 'admin' && (
-              <div className="w-full md:w-[200px]">
-                <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filter by User" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Users</SelectItem>
-                    {allUsers.map(u => (
-                      <SelectItem key={u.id} value={u.id.toString()}>{u.full_name || u.username}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex flex-col gap-2">
+                <Button 
+                  onClick={handleMarkPrinted} 
+                  disabled={selectedToolIds.length === 0}
+                  className="bg-green-600 hover:bg-green-700 text-xs h-8 whitespace-nowrap"
+                >
+                  <Printer className="w-3 h-3 mr-1" /> Mark Printed ({selectedToolIds.length})
+                </Button>
+                <div className="w-full md:w-[200px]">
+                  <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Filter by User" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Users</SelectItem>
+                      {allUsers.map(u => (
+                        <SelectItem key={u.id} value={u.id.toString()}>{u.full_name || u.username}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             )}
           </div>
@@ -1182,12 +1205,23 @@ const ToolMaster = ({ user }: { user?: User }) => {
             <Table>
               <TableHeader className="bg-gray-50">
                 <TableRow>
+                  {user?.role === 'admin' && (
+                    <TableHead className="w-12">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-gray-300 w-4 h-4"
+                        checked={filteredTools.length > 0 && selectedToolIds.length === filteredTools.length}
+                        onChange={toggleAllSelection}
+                      />
+                    </TableHead>
+                  )}
                   <TableHead>Tool Name</TableHead>
                   <TableHead>QR Code</TableHead>
                   <TableHead>Make</TableHead>
                   <TableHead>Capacity</TableHead>
                   <TableHead>Current Site</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Printed</TableHead>
                   {user?.role === 'admin' && <TableHead>Entry By</TableHead>}
                   <TableHead className="text-center">QR</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -1196,7 +1230,17 @@ const ToolMaster = ({ user }: { user?: User }) => {
               <TableBody>
                 {filteredTools.length > 0 ? (
                   filteredTools.map((tool) => (
-                    <TableRow key={tool.id} className="hover:bg-gray-50/50">
+                    <TableRow key={tool.id} className={`hover:bg-gray-50/50 ${selectedToolIds.includes(tool.id) ? 'bg-blue-50/30' : ''}`}>
+                      {user?.role === 'admin' && (
+                        <TableCell>
+                          <input 
+                            type="checkbox" 
+                            className="rounded border-gray-300 w-4 h-4 cursor-pointer"
+                            checked={selectedToolIds.includes(tool.id)}
+                            onChange={() => toggleToolSelection(tool.id)}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell className="font-medium text-[#1E3A8A]">
                         <span
                           className="cursor-pointer underline decoration-dotted underline-offset-4 decoration-gray-400 hover:text-blue-700 hover:decoration-blue-700 transition-colors"
@@ -1214,6 +1258,13 @@ const ToolMaster = ({ user }: { user?: User }) => {
                           }`}>
                           {tool.status}
                         </span>
+                      </TableCell>
+                      <TableCell>
+                        {tool.is_printed ? (
+                          <Badge className="bg-green-500 hover:bg-green-600 text-[10px]">Yes</Badge>
+                        ) : (
+                          <span className="text-gray-400 text-xs">No</span>
+                        )}
                       </TableCell>
                       {user?.role === 'admin' && (
                         <TableCell className="text-xs text-gray-500">
@@ -1266,12 +1317,12 @@ const ToolMaster = ({ user }: { user?: User }) => {
                               <Edit className="h-4 w-4" />
                             </Button>
                           )}
-                          {user?.role === 'admin' && tool.id === savedTools[0]?.id && (
+                          {user?.role === 'admin' && (
                             <Button
                               variant="ghost"
                               size="sm"
                               className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                              title="Delete latest tool"
+                              title="Delete Tool"
                               onClick={() => handleDeleteTool(tool)}
                             >
                               <Trash2 className="h-4 w-4" />
