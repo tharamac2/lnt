@@ -76,6 +76,40 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
+class LoginOTPVerifyRequest(BaseModel):
+    username: str
+    otp: str
+
+@router.post("/token/verify-otp")
+def verify_login_otp(payload: LoginOTPVerifyRequest, session: Session = Depends(get_session)):
+    statement = select(User).where(User.username == payload.username)
+    user = session.exec(statement).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="No users found")
+    if not email_utils.verify_otp(user.email, payload.otp):
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code")
+    email_utils.clear_verification(user.email)
+
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username, "role": user.role}, expires_delta=access_token_expires
+    )
+
+    log_action(
+        session, user, "login", "User", user.id,
+        f"{user.full_name or user.username} logged in",
+        site=user.site,
+    )
+    session.commit()
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "role": user.role,
+        "full_name": user.full_name,
+        "site": user.site
+    }
+
 class EmailRequest(BaseModel):
     email: EmailStr
 

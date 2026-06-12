@@ -194,12 +194,25 @@ async def upload_tools(
                 
             existing_qrs.add(qr_code)
             
+            # Get validation_period / validity_period from Excel row (normalized headers are lowercase, spaces replaced by underscores)
+            validation_period = 3
+            val_period_raw = row.get('validation_period') if 'validation_period' in row else row.get('validity_period', None)
+            
+            if val_period_raw is not None:
+                val_str = str(val_period_raw).strip()
+                if val_str and val_str.lower() != 'none':
+                    try:
+                        # Convert float like "5.0" safely to int
+                        validation_period = int(float(val_str))
+                    except (ValueError, TypeError):
+                        raise ValueError(f"Validation period '{val_period_raw}' is not a valid number. Only numeric values are acceptable.")
+
             expiry_date = None
             if date_of_supply:
                 try:
-                    expiry_date = datetime(date_of_supply.year + 3, date_of_supply.month, date_of_supply.day)
+                    expiry_date = datetime(date_of_supply.year + validation_period, date_of_supply.month, date_of_supply.day)
                 except ValueError: 
-                    expiry_date = datetime(date_of_supply.year + 3, date_of_supply.month, 28)
+                    expiry_date = datetime(date_of_supply.year + validation_period, date_of_supply.month, 28)
             
             location_val = row.get('location')
             location = str(location_val).strip() if pd.notna(location_val) and str(location_val).strip() else 'Store'
@@ -220,7 +233,7 @@ async def upload_tools(
                 current_site=location,
                 date_of_supply=date_of_supply,
                 expiry_date=expiry_date,
-                validity_period=3,
+                validity_period=validation_period,
                 qr_code=qr_code,
                 status="usable",
                 inspection_result="usable"

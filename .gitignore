@@ -26,3 +26,7 @@ uploads/*
 # Editor/OS
 .DS_Store
 Thumbs.db
+
+# Databases
+*.db
+*.db-journal

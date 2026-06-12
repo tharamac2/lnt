@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { FileDown, FileText, RefreshCw, Activity, ShieldCheck, AlertTriangle, Hammer, Calendar } from 'lucide-react';
+import { FileDown, FileText, RefreshCw, Activity, ShieldCheck, AlertTriangle, Hammer, Calendar, CheckCircle } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
@@ -24,6 +24,9 @@ import { toast } from 'sonner';
 
 import { User } from '../App';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { Badge } from '../components/ui/badge';
 
 const Dashboard = ({ user }: { user?: User }) => {
     const [loading, setLoading] = useState(true);
@@ -32,8 +35,11 @@ const Dashboard = ({ user }: { user?: User }) => {
         usable: 0,
         scrap: 0,
         expiringSoon: 0,
-        overdue: 0
+        overdue: 0,
+        deletedPrinted: 0
     });
+    const [allDeletedTools, setAllDeletedTools] = useState<any[]>([]);
+    const [isDeletedModalOpen, setIsDeletedModalOpen] = useState(false);
     const [allTools, setAllTools] = useState<any[]>([]);
     const [siteData, setSiteData] = useState<any[]>([]);
     const [statusData, setStatusData] = useState<any[]>([]);
@@ -44,7 +50,8 @@ const Dashboard = ({ user }: { user?: User }) => {
     const [totalMonthlyInspections, setTotalMonthlyInspections] = useState(0);
     const [toolAgeData, setToolAgeData] = useState<any[]>([]);
     const [siteActivityData, setSiteActivityData] = useState<any[]>([]);
-    const [atRiskTools, setAtRiskTools] = useState<any[]>([]);
+    const [expiryAlerts, setExpiryAlerts] = useState<any[]>([]);
+    const [isExpiryModalOpen, setIsExpiryModalOpen] = useState(false);
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [allSites, setAllSites] = useState<string[]>([]);
     const [userFilter, setUserFilter] = useState('all');
@@ -53,23 +60,36 @@ const Dashboard = ({ user }: { user?: User }) => {
     const fetchDashboardData = async () => {
         try {
             setLoading(true);
-            const [toolsRes, inspectionsRes, movementsRes, usersRes, sitesRes] = await Promise.all([
+            const [toolsRes, inspectionsRes, movementsRes, usersRes, sitesRes, deletedRes, alertsRes] = await Promise.all([
                 api.get('/tools/'),
                 api.get('/inspections/'),
                 api.get('/movements/?limit=100'),
                 api.get('/users/'),
-                api.get('/tools/sites/')
+                api.get('/tools/sites/'),
+                api.get('/tools/deleted-stats'),
+                api.get('/alerts/')
             ]);
 
             const tools = toolsRes.data;
             const inspections = inspectionsRes.data;
             const movements = movementsRes.data;
             const users = usersRes.data;
+            const deletedTools = deletedRes.data.tools;
+            const alerts = alertsRes.data;
 
             setAllUsers(users);
             setAllSites(sitesRes.data);
-
             setAllTools(tools);
+            setAllDeletedTools(deletedTools);
+            
+            // Filter for unread expiry alerts
+            const unreadExpiries = alerts.filter((a: any) => !a.is_read && (a.type.startsWith('expiry') || a.type === 'expired'));
+            setExpiryAlerts(unreadExpiries);
+            
+            // Automatically open modal popup if there are unread expiry alerts
+            if (unreadExpiries.length > 0) {
+                setIsExpiryModalOpen(true);
+            }
 
             // Calculate Stats
             const total = tools.length;
@@ -98,7 +118,8 @@ const Dashboard = ({ user }: { user?: User }) => {
                 usable,
                 scrap,
                 expiringSoon,
-                overdue
+                overdue,
+                deletedPrinted: deletedTools.length
             });
 
             // Prepare Chart Data
@@ -263,18 +284,54 @@ const Dashboard = ({ user }: { user?: User }) => {
                 .slice(0, 5); // Top 5 busy sites
             setSiteActivityData(activityData);
 
-            // 9. At Risk Expiry List
-            const riskList = tools
-                .filter((t: any) => t.expiry_date && new Date(t.expiry_date) > today) // Future expiry only
-                .sort((a: any, b: any) => new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime())
-                .slice(0, 5);
-            setAtRiskTools(riskList);
+
 
         } catch (error) {
             console.error("Dashboard fetch failed", error);
             toast.error("Failed to load dashboard data");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleRestoreTool = async (toolId: number) => {
+        try {
+            await api.post(`/tools/${toolId}/restore`);
+            toast.success("Tool restored successfully!");
+            fetchDashboardData();
+        } catch (error: any) {
+            console.error("Failed to restore tool", error);
+            const msg = error.response?.data?.detail || "Failed to restore tool";
+            toast.error(msg);
+        }
+    };
+
+    const handleMarkAlertRead = async (alertId: number) => {
+        try {
+            await api.post(`/alerts/${alertId}/read`);
+            setExpiryAlerts(prev => {
+                const updated = prev.filter(a => a.id !== alertId);
+                if (updated.length === 0) {
+                    setIsExpiryModalOpen(false);
+                }
+                return updated;
+            });
+            toast.success("Alert marked as read");
+        } catch (error) {
+            console.error("Failed to mark alert as read", error);
+            toast.error("Failed to mark alert as read");
+        }
+    };
+
+    const handleMarkAllAlertsRead = async () => {
+        try {
+            await Promise.all(expiryAlerts.map(a => api.post(`/alerts/${a.id}/read`)));
+            setExpiryAlerts([]);
+            setIsExpiryModalOpen(false);
+            toast.success("All alerts marked as read");
+        } catch (error) {
+            console.error("Failed to mark all alerts as read", error);
+            toast.error("Failed to mark all alerts as read");
         }
     };
 
@@ -314,7 +371,15 @@ const Dashboard = ({ user }: { user?: User }) => {
             return false;
         }).length;
 
-        setStats({ total, usable, scrap, expiringSoon, overdue });
+        let deletedFiltered = allDeletedTools;
+        if (userFilter !== 'all') {
+            deletedFiltered = deletedFiltered.filter(t => t.created_by_id === parseInt(userFilter));
+        }
+        if (siteFilter !== 'all') {
+            deletedFiltered = deletedFiltered.filter(t => t.current_site === siteFilter);
+        }
+
+        setStats({ total, usable, scrap, expiringSoon, overdue, deletedPrinted: deletedFiltered.length });
         
         // Update Chart Data (status distribution only for simplicity)
         const statusCounts: Record<string, number> = {};
@@ -518,11 +583,11 @@ const Dashboard = ({ user }: { user?: User }) => {
         autoTable(doc, {
             startY: currentY + 5,
             head: [['Tool', 'Location', 'Expiry Date', 'Days Left']],
-            body: atRiskTools.map(t => [
-                t.description,
-                t.current_site,
-                new Date(t.expiry_date).toLocaleDateString(),
-                Math.ceil((new Date(t.expiry_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+            body: filteredExpiryAlerts.map(a => [
+                a.tool?.description || 'N/A',
+                a.site || a.tool?.current_site || 'N/A',
+                a.tool?.expiry_date ? new Date(a.tool.expiry_date).toLocaleDateString() : 'N/A',
+                a.tool?.expiry_date ? Math.ceil((new Date(a.tool.expiry_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0
             ]),
             theme: 'grid',
             headStyles: { fillColor: [220, 53, 69] } // Red header for risk
@@ -553,6 +618,12 @@ const Dashboard = ({ user }: { user?: User }) => {
         doc.save(`Dashboard_Full_Report_${new Date().toISOString().split('T')[0]}.pdf`);
         toast.success("Comprehensive PDF generated!");
     };
+
+    const filteredExpiryAlerts = expiryAlerts.filter(a => {
+        if (siteFilter !== 'all' && a.site !== siteFilter) return false;
+        if (userFilter !== 'all' && a.tool?.created_by_id !== parseInt(userFilter)) return false;
+        return true;
+    });
 
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
@@ -604,7 +675,7 @@ const Dashboard = ({ user }: { user?: User }) => {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <Card className="shadow-sm border-l-4 border-l-blue-500">
                     <CardContent className="p-6 flex items-center justify-between">
                         <div>
@@ -646,6 +717,17 @@ const Dashboard = ({ user }: { user?: User }) => {
                         </div>
                         <div className="p-3 bg-amber-50 rounded-full">
                             <Calendar className="w-6 h-6 text-amber-500" />
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card className="shadow-sm border-l-4 border-l-purple-500 cursor-pointer hover:bg-purple-50/50 transition-colors" onClick={() => setIsDeletedModalOpen(true)}>
+                    <CardContent className="p-6 flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-gray-500">Deleted (Printed)</p>
+                            <h3 className="text-2xl font-bold text-gray-900">{stats.deletedPrinted}</h3>
+                        </div>
+                        <div className="p-3 bg-purple-50 rounded-full">
+                            <FileText className="w-6 h-6 text-purple-500" />
                         </div>
                     </CardContent>
                 </Card>
@@ -783,28 +865,69 @@ const Dashboard = ({ user }: { user?: User }) => {
                     </CardContent>
                 </Card>
 
-                {/* 9. At Risk Expiry List (New) */}
-                <Card className="lg:col-span-1">
-                    <CardHeader><CardTitle className="text-lg">Next Expiring Tools</CardTitle></CardHeader>
+                {/* 9. Active Expiry Alerts (Modified) */}
+                <Card className="lg:col-span-1 shadow-sm border-l-4 border-l-[#DC2626]">
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-lg flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5 text-[#DC2626]" /> Active Expiry Alerts
+                            </CardTitle>
+                            {filteredExpiryAlerts.length > 0 && (
+                                <Badge className="bg-[#DC2626] text-white">
+                                    {filteredExpiryAlerts.length}
+                                </Badge>
+                            )}
+                        </div>
+                    </CardHeader>
                     <CardContent>
                         <div className="space-y-3">
-                            {atRiskTools.map((tool, i) => (
-                                <div key={i} className="flex items-center justify-between p-2 bg-red-50 border border-red-100 rounded text-sm">
-                                    <div className="flex flex-col">
-                                        <span className="font-medium text-gray-900">{tool.description}</span>
-                                        <span className="text-xs text-gray-500">{tool.qr_code}</span>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="font-bold text-red-600">
-                                            {tool.expiry_date ? new Date(tool.expiry_date).toLocaleDateString() : '-'}
-                                        </div>
-                                        <span className="text-xs text-red-500">
-                                            {tool.expiry_date ? Math.ceil((new Date(tool.expiry_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0} days left
+                            {filteredExpiryAlerts.map((alert) => (
+                                <div key={alert.id} className="flex items-center justify-between p-3 bg-red-50 border border-red-100 rounded-lg text-sm transition-all hover:shadow-sm">
+                                    <div className="flex flex-col flex-1 min-w-0 pr-2">
+                                        <span className="font-semibold text-gray-900 truncate">{alert.tool?.description || alert.title}</span>
+                                        <span className="text-xs text-gray-500 font-mono">{alert.tool?.qr_code}</span>
+                                        <span className="text-xs text-red-600 font-medium mt-1">
+                                            {alert.title}
                                         </span>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <div className="text-right">
+                                            <div className="font-bold text-red-600 text-xs">
+                                                {alert.tool?.expiry_date ? new Date(alert.tool.expiry_date).toLocaleDateString() : ''}
+                                            </div>
+                                            <span className="text-[10px] text-gray-400 font-medium block">
+                                                Expiry Date
+                                            </span>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-full"
+                                            title="Mark as Read"
+                                            onClick={() => handleMarkAlertRead(alert.id)}
+                                        >
+                                            <CheckCircle className="w-4 h-4" />
+                                        </Button>
                                     </div>
                                 </div>
                             ))}
-                            {atRiskTools.length === 0 && <p className="text-gray-500 text-sm">No upcoming expiries.</p>}
+                            {filteredExpiryAlerts.length === 0 && (
+                                <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                                    <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
+                                    <p className="text-xs font-medium text-gray-700">All tools are up to date</p>
+                                    <p className="text-[10px] text-gray-400 mt-0.5">No active alerts within 90 days</p>
+                                </div>
+                            )}
+                            {filteredExpiryAlerts.length > 0 && (
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="w-full text-xs text-[#DC2626] border-red-200 hover:bg-red-50 hover:text-red-700 mt-2" 
+                                    onClick={handleMarkAllAlertsRead}
+                                >
+                                    Acknowledge All ({filteredExpiryAlerts.length})
+                                </Button>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -837,6 +960,115 @@ const Dashboard = ({ user }: { user?: User }) => {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Deleted Tools Modal */}
+            <Dialog open={isDeletedModalOpen} onOpenChange={setIsDeletedModalOpen}>
+                <DialogContent className="max-w-5xl md:max-w-6xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Deleted Tools (Printed)</DialogTitle>
+                    </DialogHeader>
+                    <div className="mt-4">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>QR Code</TableHead>
+                                    <TableHead>Tool Name</TableHead>
+                                    <TableHead>Make</TableHead>
+                                    <TableHead>Capacity</TableHead>
+                                    <TableHead>Last Known Site</TableHead>
+                                    {user?.role === 'admin' && <TableHead className="text-right">Actions</TableHead>}
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {allDeletedTools.map((tool) => (
+                                    <TableRow key={tool.id}>
+                                        <TableCell className="font-mono text-xs">{tool.qr_code}</TableCell>
+                                        <TableCell>{tool.description}</TableCell>
+                                        <TableCell>{tool.make}</TableCell>
+                                        <TableCell>{tool.capacity}</TableCell>
+                                        <TableCell>{tool.current_site || '-'}</TableCell>
+                                        {user?.role === 'admin' && (
+                                            <TableCell className="text-right">
+                                                <Button 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    className="bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200"
+                                                    onClick={() => handleRestoreTool(tool.id)}
+                                                >
+                                                    Restore
+                                                </Button>
+                                            </TableCell>
+                                        )}
+                                    </TableRow>
+                                ))}
+                                {allDeletedTools.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={user?.role === 'admin' ? 6 : 5} className="text-center py-8 text-gray-500">
+                                            No deleted tools found.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Expiry Warnings Modal */}
+            <Dialog open={isExpiryModalOpen} onOpenChange={setIsExpiryModalOpen}>
+                <DialogContent className="max-w-4xl md:max-w-5xl max-h-[80vh] overflow-y-auto border-l-4 border-l-[#DC2626]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-xl text-[#DC2626] font-bold">
+                            <AlertTriangle className="w-6 h-6 text-[#DC2626]" /> Tool Expiry Alerts
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="mt-4 space-y-4">
+                        <p className="text-sm text-gray-500">
+                            The following tools are nearing their expiry milestones. Please acknowledge these warnings.
+                        </p>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>QR Code</TableHead>
+                                    <TableHead>Tool Description</TableHead>
+                                    <TableHead>Warning</TableHead>
+                                    <TableHead>Expiry Date</TableHead>
+                                    <TableHead className="text-right">Action</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredExpiryAlerts.map((alert) => (
+                                    <TableRow key={alert.id} className="hover:bg-red-50/30">
+                                        <TableCell className="font-mono text-xs">{alert.tool?.qr_code || '-'}</TableCell>
+                                        <TableCell className="font-medium">{alert.tool?.description || alert.title}</TableCell>
+                                        <TableCell className="text-xs text-red-600 font-semibold">{alert.title}</TableCell>
+                                        <TableCell className="text-xs">
+                                            {alert.tool?.expiry_date ? new Date(alert.tool.expiry_date).toLocaleDateString() : '-'}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                className="bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200"
+                                                onClick={() => handleMarkAlertRead(alert.id)}
+                                            >
+                                                Acknowledge
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {filteredExpiryAlerts.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                                            No active warnings found.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
         </div>
     );

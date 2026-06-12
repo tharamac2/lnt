@@ -1,10 +1,9 @@
 from sqlmodel import create_engine, Session, SQLModel
 
-# DATABASE CONNECTION STRING
-# XAMPP Default: user='root', password='' (empty)
-DATABASE_URL = "mysql+pymysql://root:@localhost:3306/qr_tools_db"
+# Use SQLite instead of MySQL for local testing
+DATABASE_URL = "sqlite:///./qr_tools_db.db"
 
-engine = create_engine(DATABASE_URL, echo=True)
+engine = create_engine(DATABASE_URL, echo=False, connect_args={"check_same_thread": False})
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)

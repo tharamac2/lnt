@@ -1,6 +1,7 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { User } from '../App';
+import api from '../services/api';
 import {
   LayoutDashboard,
   Package,
@@ -159,12 +160,37 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
 
   const filteredNavItems = navItems.filter(item => item.roles.includes(user.role));
 
-  // Mock notifications
-  const notifications = [
-    { id: 1, title: 'Tool Expiring Soon', message: 'Chain Hoist 5T expires on Jan 15, 2025', time: '5m ago', unread: true },
-    { id: 2, title: 'Inspection Overdue', message: 'Wire Rope Sling needs inspection', time: '1h ago', unread: true },
-    { id: 3, title: 'New Tool Added', message: 'Hydraulic Jack 20T added to inventory', time: '2h ago', unread: false },
-  ];
+  const [alerts, setAlerts] = useState<any[]>([]);
+
+  const fetchLayoutAlerts = async () => {
+    try {
+      const response = await api.get('/alerts/');
+      setAlerts(response.data);
+    } catch (error) {
+      console.error("Layout failed to fetch alerts", error);
+    }
+  };
+
+  useEffect(() => {
+    if (user && (user.role === 'admin' || user.role === 'management')) {
+      fetchLayoutAlerts();
+      const interval = setInterval(fetchLayoutAlerts, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  const handleNotificationClick = async (alertId: number, isRead: boolean) => {
+    if (isRead) return;
+    try {
+      await api.post(`/alerts/${alertId}/read`);
+      fetchLayoutAlerts();
+    } catch (error) {
+      console.error("Failed to mark alert as read", error);
+    }
+  };
+
+  const layoutNotifications = alerts.slice(0, 5);
+  const unreadCount = alerts.filter((a: any) => !a.is_read).length;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#CFDBFF]">
@@ -204,40 +230,51 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
                   <Bell className="w-5 h-5" />
-                  <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center bg-[#DC2626] text-white text-xs">
-                    {notifications.filter(n => n.unread).length}
-                  </Badge>
+                  {unreadCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center bg-[#DC2626] text-white text-xs">
+                      {unreadCount}
+                    </Badge>
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80">
                 <DropdownMenuLabel className="flex items-center justify-between">
                   <span>Notifications</span>
-                  <Badge variant="secondary">{notifications.filter(n => n.unread).length} New</Badge>
+                  <Badge variant="secondary">{unreadCount} New</Badge>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <ScrollArea className="h-[300px]">
-                  {notifications.map((notification) => (
+                  {layoutNotifications.map((notification) => (
                     <div
                       key={notification.id}
-                      className={`px-3 py-3 hover:bg-gray-50 cursor-pointer border-b ${notification.unread ? 'bg-blue-50' : ''
-                        }`}
+                      className={`px-3 py-3 hover:bg-gray-50 cursor-pointer border-b ${!notification.is_read ? 'bg-blue-50' : ''}`}
+                      onClick={() => handleNotificationClick(notification.id, notification.is_read)}
                     >
                       <div className="flex items-start gap-3">
-                        <div className={`w-2 h-2 rounded-full mt-2 ${notification.unread ? 'bg-[#1E3A8A]' : 'bg-gray-300'}`} />
+                        <div className={`w-2 h-2 rounded-full mt-2 ${!notification.is_read ? 'bg-[#1E3A8A]' : 'bg-gray-300'}`} />
                         <div className="flex-1">
                           <p className="font-medium text-sm">{notification.title}</p>
                           <p className="text-xs text-gray-600 mt-1">{notification.message}</p>
-                          <p className="text-xs text-gray-400 mt-1">{notification.time}</p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {new Date(notification.date).toLocaleDateString()} {new Date(notification.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
                         </div>
                       </div>
                     </div>
                   ))}
+                  {layoutNotifications.length === 0 && (
+                    <div className="p-4 text-center text-sm text-gray-500">
+                      No notifications
+                    </div>
+                  )}
                 </ScrollArea>
                 <DropdownMenuSeparator />
                 <div className="p-2">
-                  <Button variant="ghost" className="w-full text-sm">
-                    View All Notifications
-                  </Button>
+                  <Link to="/alerts">
+                    <Button variant="ghost" className="w-full text-sm">
+                      View All Notifications
+                    </Button>
+                  </Link>
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -27,6 +27,11 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // --- Login OTP state ---
+  const [otpRequired, setOtpRequired] = useState(false);
+  const [loginOtp, setLoginOtp] = useState('');
+  const [otpEmail, setOtpEmail] = useState('');
+
   const handleRoleSelect = (role: string) => {
     if (role === 'worker') {
       handleWorkerAccess();
@@ -46,6 +51,9 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
     setUsername('');
     setPassword('');
     setScannedQr(null);
+    setOtpRequired(false);
+    setLoginOtp('');
+    setOtpEmail('');
   };
 
   const handleNavigation = (role: string, extraState = {}) => {
@@ -110,6 +118,13 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       });
 
+      if (response.data.otp_required) {
+        setOtpRequired(true);
+        setOtpEmail(response.data.email);
+        toast.success(`Verification code sent to ${response.data.email}`);
+        return;
+      }
+
       const { access_token, role } = response.data;
 
       // Role enforcement: Check if the user's role matches the selected portal
@@ -145,6 +160,55 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
         toast.error('Server is unreachable. Please try again later.');
       } else {
         toast.error('Login failed. Please try again.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleVerifyLoginOtp = async () => {
+    if (!loginOtp.trim()) {
+      toast.error('Please enter the verification code');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const response = await api.post('/users/token/verify-otp', {
+        username: username.trim(),
+        otp: loginOtp.trim(),
+      });
+
+      const { access_token, role } = response.data;
+
+      // Role enforcement: Check if the user's role matches the selected portal
+      // Exception: allow 'admin' to access any portal
+      if (selectedRole && role !== selectedRole && role !== 'admin') {
+        toast.error('Invalid username or password');
+        return;
+      }
+
+      sessionStorage.setItem('token', access_token);
+
+      // Fetch full profile from backend to guarantee latest fields (name, site)
+      const profileRes = await api.get('/users/me');
+      const profile = profileRes.data;
+
+      const user: User = {
+        id: profile.username || username,
+        name: profile.full_name || profile.username || username,
+        role: profile.role as User['role'],
+        site: profile.site
+      };
+
+      onLogin(user);
+      toast.success('Login successful');
+      handleNavigation(role, scannedQr ? { qrCode: scannedQr } : {});
+    } catch (error: any) {
+      console.error('OTP verification failed', error);
+      if (error.response && error.response.data && error.response.data.detail) {
+        toast.error(error.response.data.detail);
+      } else {
+        toast.error('Verification failed. Please try again.');
       }
     } finally {
       setSubmitting(false);
@@ -385,9 +449,10 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                       placeholder="Enter password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                      onKeyDown={(e) => e.key === 'Enter' && !otpRequired && handleLogin()}
                       className="h-12 w-full pl-10 pr-10 rounded-xl border-white/10 bg-black/40 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm shadow-inner transition-all text-white placeholder:text-neutral-600"
                       autoFocus={selectedRole !== 'store' && selectedRole !== 'inspector' && selectedRole !== 'data_entry' && selectedRole !== 'inspection_employee'}
+                      disabled={otpRequired}
                     />
                     <button
                       type="button"
@@ -399,13 +464,38 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                   </div>
                 </div>
 
+                {otpRequired && (
+                  <div className="space-y-2">
+                    <Label htmlFor="login-otp" className="text-xs font-bold text-neutral-400 uppercase tracking-wider block">Verification Code</Label>
+                    <Input
+                      id="login-otp"
+                      type="text"
+                      placeholder={`Enter the code sent to ${otpEmail}`}
+                      value={loginOtp}
+                      onChange={(e) => setLoginOtp(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleVerifyLoginOtp()}
+                      maxLength={6}
+                      className="h-12 w-full px-3 rounded-xl border-white/10 bg-black/40 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm shadow-inner transition-all text-white placeholder:text-neutral-600"
+                      autoFocus
+                    />
+                    <p className="text-xs text-neutral-500">A verification code was sent to {otpEmail}.</p>
+                    <button
+                      type="button"
+                      onClick={() => { setOtpRequired(false); setLoginOtp(''); }}
+                      className="text-xs text-blue-400 hover:text-blue-300 font-medium"
+                    >
+                      &larr; Use a different account
+                    </button>
+                  </div>
+                )}
+
                 <div className="pt-4">
                   <Button
                     className="w-full h-12 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.23)] hover:-translate-y-0.5 transition-all duration-200"
-                    onClick={handleLogin}
+                    onClick={otpRequired ? handleVerifyLoginOtp : handleLogin}
                     disabled={submitting}
                   >
-                    {submitting ? 'Please wait...' : 'Sign In'}
+                    {submitting ? 'Please wait...' : otpRequired ? 'Verify & Sign In' : 'Sign In'}
                   </Button>
                 </div>
               </div>
