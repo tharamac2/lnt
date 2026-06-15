@@ -25,6 +25,20 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()
+    # Run migrations for custom_fields column in dealer table (SQLite fallback)
+    from .database import engine
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("SELECT custom_fields FROM dealer LIMIT 1"))
+        except Exception:
+            try:
+                # SQLite ALTER TABLE support
+                conn.execute(text("ALTER TABLE dealer ADD COLUMN custom_fields TEXT"))
+                conn.commit()
+                print("Migration: Successfully added 'custom_fields' column to 'dealer' table.")
+            except Exception as e:
+                print(f"Migration error adding 'custom_fields' column: {e}")
 
 # Mount uploads directory to serve files
 app.mount("/api/uploads", StaticFiles(directory="uploads"), name="uploads")

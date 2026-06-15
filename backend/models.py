@@ -262,6 +262,7 @@ class DealerBase(SQLModel):
     contact_number: Optional[str] = None
     address: Optional[str] = None
     gst_number: Optional[str] = None
+    custom_fields: Optional[str] = None # JSON string for custom field values: {"field_name": "value"}
 
 class Dealer(DealerBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -281,3 +282,25 @@ class DealerUpdate(SQLModel):
     contact_number: Optional[str] = None
     address: Optional[str] = None
     gst_number: Optional[str] = None
+    custom_fields: Optional[str] = None
+
+
+class DealerCustomFieldBase(SQLModel):
+    name: str = Field(index=True, unique=True)
+    field_type: str  # text, number, file
+    is_required: bool = Field(default=False)
+
+class DealerCustomField(DealerCustomFieldBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+class DealerCustomFieldCreate(DealerCustomFieldBase):
+    pass
+
+class DealerCustomFieldRead(DealerCustomFieldBase):
+    id: int
+
+class DealerCustomFieldUpdate(SQLModel):
+    name: Optional[str] = None
+    field_type: Optional[str] = None
+    is_required: Optional[bool] = None
+

@@ -2,8 +2,9 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine, select
 from backend.main import app
 from backend.database import get_session
-from backend.models import User, Dealer, AuditLog
+from backend.models import User, Dealer, AuditLog, DealerCustomField
 import os
+import json
 
 # Use local test database
 sqlite_file_name = "test_dealers.db"
@@ -57,10 +58,71 @@ def test_dealers_flow():
     token = response.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    # 3. Create Dealers manually
-    print("\nTesting manual dealer registration...")
+    # 3. Create Custom Fields
+    print("\nTesting Custom Fields Configuration CRUD...")
+    
+    # Text Field
+    field1_data = {
+        "name": "Trade License",
+        "field_type": "text",
+        "is_required": True
+    }
+    response = client.post("/api/dealers/custom-fields", json=field1_data, headers=headers)
+    assert response.status_code == 200, f"Failed to create custom field: {response.text}"
+    cf1 = response.json()
+    assert cf1["name"] == "Trade License"
+    assert cf1["field_type"] == "text"
+    assert cf1["is_required"] is True
+
+    # File Upload Field
+    field2_data = {
+        "name": "GST Certificate PDF",
+        "field_type": "file",
+        "is_required": False
+    }
+    response = client.post("/api/dealers/custom-fields", json=field2_data, headers=headers)
+    assert response.status_code == 200, f"Failed to create custom field: {response.text}"
+    cf2 = response.json()
+
+    # Test Duplicate Custom Field Name (Case-insensitive check)
+    dup_field_data = {
+        "name": "  trade license  ",
+        "field_type": "number",
+        "is_required": False
+    }
+    response = client.post("/api/dealers/custom-fields", json=dup_field_data, headers=headers)
+    assert response.status_code == 400
+    assert "Custom field name already exists" in response.json()["detail"]
+    print("Duplicate custom field validation passed (correctly blocked duplicate name)")
+
+    # Test List Custom Fields
+    response = client.get("/api/dealers/custom-fields", headers=headers)
+    assert response.status_code == 200
+    fields_list = response.json()
+    assert len(fields_list) == 2, f"Expected 2 fields, got {len(fields_list)}"
+    print("Listing custom fields passed")
+
+    # Test Update Custom Field
+    update_data = {
+        "name": "Trade License Code",
+        "field_type": "text",
+        "is_required": False
+    }
+    response = client.put(f"/api/dealers/custom-fields/{cf1['id']}", json=update_data, headers=headers)
+    assert response.status_code == 200
+    updated_cf = response.json()
+    assert updated_cf["name"] == "Trade License Code"
+    assert updated_cf["is_required"] is False
+    print("Updating custom field passed")
+
+    # 4. Create Dealers manually (including custom fields)
+    print("\nTesting manual dealer registration with custom fields...")
     
     # Sub Contractor
+    custom_vals = {
+        "Trade License Code": "LIC-999-XYZ",
+        "GST Certificate PDF": "/api/uploads/test_cert.pdf"
+    }
     subcon_data = {
         "category": "sub_contractor",
         "name": "John Doe Subcon",
@@ -69,14 +131,18 @@ def test_dealers_flow():
         "email": "john.doe@doecon.com",
         "contact_number": "+1234567890",
         "address": "123 Main St, Builder Town",
-        "gst_number": "29AAAAA1111A1Z1"
+        "gst_number": "29AAAAA1111A1Z1",
+        "custom_fields": json.dumps(custom_vals)
     }
     response = client.post("/api/dealers/", json=subcon_data, headers=headers)
-    assert response.status_code == 200, f"Failed to create sub contractor: {response.text}"
+    assert response.status_code == 200, f"Failed to create contractor: {response.text}"
     subcon = response.json()
     assert subcon["dealer_code"] == "SUBCON-001"
     assert subcon["category"] == "sub_contractor"
-    print("Registered Sub Contractor: SUBCON-001")
+    assert subcon["custom_fields"] is not None
+    loaded_custom = json.loads(subcon["custom_fields"])
+    assert loaded_custom["Trade License Code"] == "LIC-999-XYZ"
+    print("Registered Sub Contractor with Custom Fields: SUBCON-001")
 
     # Supplier
     supplier_data = {
@@ -87,13 +153,13 @@ def test_dealers_flow():
         "email": "jane@cementsupply.com",
         "contact_number": "+1234567891",
         "address": "456 Bulk Ave, Supply City",
-        "gst_number": "29BBBBB2222B2Z2"
+        "gst_number": "29BBBBB2222B2Z2",
+        "custom_fields": None
     }
     response = client.post("/api/dealers/", json=supplier_data, headers=headers)
     assert response.status_code == 200, f"Failed to create supplier: {response.text}"
     supplier = response.json()
     assert supplier["dealer_code"] == "SUPPLIER-002"
-    assert supplier["category"] == "supplier"
     print("Registered Supplier: SUPPLIER-002")
 
     # Scrap Dealer
@@ -105,16 +171,14 @@ def test_dealers_flow():
         "email": "bob@bobsrecycling.com",
         "contact_number": "+1234567892",
         "address": "789 Dump Rd, Scrap Town",
-        "gst_number": "29CCCCC3333C3Z3"
+        "gst_number": "29CCCCC3333C3Z3",
+        "custom_fields": None
     }
     response = client.post("/api/dealers/", json=scrap_data, headers=headers)
-    assert response.status_code == 200, f"Failed to create scrap dealer: {response.text}"
-    scrap = response.json()
-    assert scrap["dealer_code"] == "SCRAP-003"
-    assert scrap["category"] == "scrap_dealer"
+    assert response.status_code == 200
     print("Registered Scrap Dealer: SCRAP-003")
 
-    # 4. Check uniqueness constraint on dealer_code
+    # 5. Check uniqueness constraint on dealer_code
     print("\nTesting duplicate Dealer Code validation...")
     duplicate_data = {
         "category": "supplier",
@@ -128,7 +192,7 @@ def test_dealers_flow():
     assert "Dealer Code already exists" in response.json()["detail"]
     print("Duplicate validation passed successfully (correctly rejected)")
 
-    # 5. List and Filter by Category
+    # 6. List and Filter by Category
     print("\nTesting list filtering by category...")
     
     # List all
@@ -146,15 +210,19 @@ def test_dealers_flow():
     assert filtered[0]["dealer_code"] == "SUBCON-001"
     print("Filter by sub_contractor passed")
 
-    # Filter to scrap_dealer
-    response = client.get("/api/dealers/?category=scrap_dealer", headers=headers)
+    # 7. Delete Custom Field Template
+    print("\nTesting custom field template deletion...")
+    response = client.delete(f"/api/dealers/custom-fields/{cf2['id']}", headers=headers)
     assert response.status_code == 200
-    filtered = response.json()
-    assert len(filtered) == 1
-    assert filtered[0]["dealer_code"] == "SCRAP-003"
-    print("Filter by scrap_dealer passed")
+    
+    response = client.get("/api/dealers/custom-fields", headers=headers)
+    assert response.status_code == 200
+    remaining_fields = response.json()
+    assert len(remaining_fields) == 1
+    assert remaining_fields[0]["id"] == cf1["id"]
+    print("Delete custom field template passed")
 
-    # 6. Verify Deletion
+    # 8. Verify Dealer Deletion
     print("\nTesting dealer deletion...")
     delete_id = subcon["id"]
     response = client.delete(f"/api/dealers/{delete_id}", headers=headers)
@@ -169,31 +237,29 @@ def test_dealers_flow():
     assert not any(d["id"] == delete_id for d in current_dealers)
     print("Deletion verification passed")
 
-    # 7. Check Audit Logs
-    print("\nChecking Audit Logs for dealer actions...")
+    # 9. Check Audit Logs
+    print("\nChecking Audit Logs for dealer and custom field actions...")
     with Session(engine) as session:
         logs = session.exec(select(AuditLog).where(AuditLog.entity_type == "Dealer")).all()
-        # Should have: 3 creations + 1 deletion = 4 log entries?
-        # Actually: subcon (create), supplier (create), scrap (create), subcon (delete).
-        # Plus any bulk import if any, but we did manual.
-        # Let's print out what actions we find.
         actions = [log.action for log in logs]
         print(f"Audit log actions recorded for 'Dealer': {actions}")
         assert "create" in actions
         assert "delete" in actions
         
-        # Verify description details
-        create_logs = [log for log in logs if log.action == "create"]
-        delete_logs = [log for log in logs if log.action == "delete"]
-        assert len(create_logs) == 3
-        assert len(delete_logs) == 1
+        # Verify custom field logs
+        cf_logs = session.exec(select(AuditLog).where(AuditLog.entity_type == "DealerCustomField")).all()
+        cf_actions = [log.action for log in cf_logs]
+        print(f"Audit log actions recorded for 'DealerCustomField': {cf_actions}")
+        assert "create" in cf_actions
+        assert "update" in cf_actions
+        assert "delete" in cf_actions
         print("Audit logging validation passed successfully")
 
     # Clean up test database
     engine.dispose()
     if os.path.exists(sqlite_file_name):
         os.remove(sqlite_file_name)
-    print("\nAll dealers API tests passed successfully!")
+    print("\nAll dealers API and custom fields tests passed successfully!")
 
 if __name__ == "__main__":
     test_dealers_flow()

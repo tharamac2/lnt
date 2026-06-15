@@ -6,7 +6,26 @@ import { Label } from '../components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Truck, Users, Trash2, Search, PlusCircle, AlertCircle, FileSpreadsheet, UploadCloud, Building2, Mail, Phone, MapPin, Hash } from 'lucide-react';
+import {
+  Truck,
+  Users,
+  Trash2,
+  Search,
+  PlusCircle,
+  FileSpreadsheet,
+  Building2,
+  Mail,
+  Phone,
+  MapPin,
+  Sliders,
+  ChevronDown,
+  ChevronUp,
+  SlidersHorizontal,
+  Plus,
+  Trash,
+  Upload,
+  Check
+} from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../services/api';
 
@@ -20,14 +39,23 @@ interface Dealer {
   contact_number: string | null;
   address: string | null;
   gst_number: string | null;
+  custom_fields: string | null; // JSON string of custom fields
+}
+
+interface CustomFieldDef {
+  id: number;
+  name: string;
+  field_type: 'text' | 'number' | 'file';
+  is_required: boolean;
 }
 
 const DealersPage = () => {
   const [dealers, setDealers] = useState<Dealer[]>([]);
+  const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDef[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState('sub_contractor');
-  
+
   // Form States
   const [name, setName] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -36,8 +64,20 @@ const DealersPage = () => {
   const [contactNumber, setContactNumber] = useState('');
   const [address, setAddress] = useState('');
   const [gstNumber, setGstNumber] = useState('');
+  const [customValues, setCustomValues] = useState<Record<string, any>>({});
   const [submitting, setSubmitting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+
+  // Custom Field Form state (for creating a custom field)
+  const [showFieldBuilder, setShowFieldBuilder] = useState(false);
+  const [newFieldName, setNewFieldName] = useState('');
+  const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'file'>('text');
+  const [newFieldRequired, setNewFieldRequired] = useState(false);
+  const [savingField, setSavingField] = useState(false);
+
+  // UI States
+  const [expandedDealerId, setExpandedDealerId] = useState<number | null>(null);
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
 
   const fetchDealers = async () => {
     setLoading(true);
@@ -52,8 +92,18 @@ const DealersPage = () => {
     }
   };
 
+  const fetchCustomFieldDefs = async () => {
+    try {
+      const response = await api.get('/dealers/custom-fields');
+      setCustomFieldDefs(response.data);
+    } catch (error) {
+      console.error('Failed to fetch custom field definitions', error);
+    }
+  };
+
   useEffect(() => {
     fetchDealers();
+    fetchCustomFieldDefs();
   }, []);
 
   const handleAddDealer = async (e: React.FormEvent) => {
@@ -63,8 +113,18 @@ const DealersPage = () => {
       return;
     }
 
+    // Validate required custom fields
+    for (const fdef of customFieldDefs) {
+      if (fdef.is_required && (!customValues[fdef.name] || !customValues[fdef.name].toString().trim())) {
+        toast.error(`Custom field "${fdef.name}" is required`);
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
+      const payloadCustomFields = Object.keys(customValues).length > 0 ? JSON.stringify(customValues) : null;
+
       await api.post('/dealers/', {
         category,
         name: name.trim(),
@@ -74,9 +134,10 @@ const DealersPage = () => {
         contact_number: contactNumber.trim() || null,
         address: address.trim() || null,
         gst_number: gstNumber.trim() || null,
+        custom_fields: payloadCustomFields
       });
       toast.success('Dealer registered successfully!');
-      
+
       // Clear fields
       setName('');
       setCompanyName('');
@@ -85,7 +146,8 @@ const DealersPage = () => {
       setContactNumber('');
       setAddress('');
       setGstNumber('');
-      
+      setCustomValues({});
+
       fetchDealers();
     } catch (error: any) {
       console.error('Failed to register dealer', error);
@@ -104,6 +166,9 @@ const DealersPage = () => {
     try {
       await api.delete(`/dealers/${id}`);
       toast.success('Dealer deleted successfully.');
+      if (expandedDealerId === id) {
+        setExpandedDealerId(null);
+      }
       fetchDealers();
     } catch (error: any) {
       console.error('Failed to delete dealer', error);
@@ -137,6 +202,70 @@ const DealersPage = () => {
     }
   };
 
+  // Custom Fields Builder Operations
+  const handleCreateCustomField = async () => {
+    if (!newFieldName.trim()) {
+      toast.error('Field name is required');
+      return;
+    }
+    setSavingField(true);
+    try {
+      await api.post('/dealers/custom-fields', {
+        name: newFieldName.trim(),
+        field_type: newFieldType,
+        is_required: newFieldRequired
+      });
+      toast.success('Custom field template added successfully');
+      setNewFieldName('');
+      setNewFieldRequired(false);
+      setShowFieldBuilder(false);
+      fetchCustomFieldDefs();
+    } catch (error: any) {
+      console.error(error);
+      const detail = error.response?.data?.detail || 'Failed to add custom field';
+      toast.error(detail);
+    } finally {
+      setSavingField(false);
+    }
+  };
+
+  const handleDeleteCustomField = async (id: number, fieldName: string) => {
+    if (!window.confirm(`Are you sure you want to delete the custom field template "${fieldName}"?\nThis won't delete data already stored on existing dealers, but the field will no longer appear in the registration form.`)) {
+      return;
+    }
+    try {
+      await api.delete(`/dealers/custom-fields/${id}`);
+      toast.success('Custom field template deleted successfully.');
+      fetchCustomFieldDefs();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to delete custom field template');
+    }
+  };
+
+  const handleCustomFileUpload = async (fieldName: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    setUploadingField(fieldName);
+    try {
+      const response = await api.post('/upload/certificate', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setCustomValues(prev => ({
+        ...prev,
+        [fieldName]: response.data.url
+      }));
+      toast.success(`${fieldName} uploaded successfully`);
+    } catch (error) {
+      console.error('Failed to upload file', error);
+      toast.error(`Failed to upload ${fieldName}`);
+    } finally {
+      setUploadingField(null);
+    }
+  };
+
   const filteredDealers = dealers.filter(
     (d) =>
       d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -166,6 +295,7 @@ const DealersPage = () => {
         <Table>
           <TableHeader className="bg-gray-50">
             <TableRow>
+              <TableHead className="w-[40px]"></TableHead>
               <TableHead className="w-[60px] font-semibold text-gray-600">S.No</TableHead>
               <TableHead className="font-semibold text-gray-600">Name</TableHead>
               <TableHead className="font-semibold text-gray-600">Company</TableHead>
@@ -176,41 +306,136 @@ const DealersPage = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {list.map((dealer, index) => (
-              <TableRow key={dealer.id} className="hover:bg-gray-50/50 transition-colors">
-                <TableCell className="font-medium text-gray-500">{index + 1}</TableCell>
-                <TableCell className="font-semibold text-gray-800">{dealer.name}</TableCell>
-                <TableCell className="text-gray-600 font-medium">{dealer.company_name}</TableCell>
-                <TableCell className="font-mono text-xs text-indigo-600 font-semibold">{dealer.dealer_code}</TableCell>
-                <TableCell className="font-mono text-xs text-gray-600">{dealer.gst_number || '-'}</TableCell>
-                <TableCell className="text-xs text-gray-600">
-                  {dealer.email && (
-                    <div className="flex items-center gap-1">
-                      <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                      <span>{dealer.email}</span>
-                    </div>
-                  )}
-                  {dealer.contact_number && (
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                      <span>{dealer.contact_number}</span>
-                    </div>
-                  )}
-                  {!dealer.email && !dealer.contact_number && '-'}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteDealer(dealer.id, dealer.name)}
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
-                    title="Delete Dealer"
+            {list.map((dealer, index) => {
+              const isExpanded = expandedDealerId === dealer.id;
+              let customFieldsObj: Record<string, any> = {};
+              if (dealer.custom_fields) {
+                try {
+                  customFieldsObj = JSON.parse(dealer.custom_fields);
+                } catch (e) {
+                  console.error('Failed to parse custom fields JSON', e);
+                }
+              }
+              return (
+                <React.Fragment key={dealer.id}>
+                  <TableRow
+                    className="hover:bg-gray-50/50 transition-colors cursor-pointer"
+                    onClick={() => setExpandedDealerId(isExpanded ? null : dealer.id)}
                   >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
+                    <TableCell className="p-2 text-center" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="w-7 h-7"
+                        onClick={() => setExpandedDealerId(isExpanded ? null : dealer.id)}
+                      >
+                        {isExpanded ? (
+                          <ChevronUp className="w-4 h-4 text-indigo-600" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-gray-400" />
+                        )}
+                      </Button>
+                    </TableCell>
+                    <TableCell className="font-medium text-gray-500">{index + 1}</TableCell>
+                    <TableCell className="font-semibold text-gray-850">{dealer.name}</TableCell>
+                    <TableCell className="text-gray-600 font-medium">{dealer.company_name}</TableCell>
+                    <TableCell className="font-mono text-xs text-indigo-600 font-semibold">{dealer.dealer_code}</TableCell>
+                    <TableCell className="font-mono text-xs text-gray-600">{dealer.gst_number || '-'}</TableCell>
+                    <TableCell className="text-xs text-gray-600">
+                      {dealer.email && (
+                        <div className="flex items-center gap-1">
+                          <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span>{dealer.email}</span>
+                        </div>
+                      )}
+                      {dealer.contact_number && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span>{dealer.contact_number}</span>
+                        </div>
+                      )}
+                      {!dealer.email && !dealer.contact_number && '-'}
+                    </TableCell>
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteDealer(dealer.id, dealer.name)}
+                        className="text-red-500 hover:text-red-750 hover:bg-red-50 transition-colors"
+                        title="Delete Dealer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+
+                  {isExpanded && (
+                    <TableRow className="bg-slate-50/50 hover:bg-slate-50/50">
+                      <TableCell colSpan={8} className="p-4 border-t border-slate-100">
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                          {/* Address details */}
+                          <div className="flex items-start gap-2.5 text-xs text-slate-600">
+                            <MapPin className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-semibold text-slate-700 block mb-0.5">Address</span>
+                              {dealer.address || 'No address provided'}
+                            </div>
+                          </div>
+
+                          {/* Custom Fields details */}
+                          <div className="border-t border-slate-200/50 pt-3">
+                            <span className="font-semibold text-slate-700 text-xs block mb-2.5">
+                              Custom Field Parameters
+                            </span>
+                            {Object.keys(customFieldsObj).length > 0 ? (
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {Object.entries(customFieldsObj).map(([key, val]) => {
+                                  const isFile = typeof val === 'string' && val.startsWith('/api/uploads/');
+                                  return (
+                                    <div
+                                      key={key}
+                                      className="bg-white p-3 rounded-lg border border-slate-200 shadow-xs flex items-center justify-between gap-3"
+                                    >
+                                      <div className="min-w-0">
+                                        <span className="text-[10px] text-slate-400 block font-semibold uppercase tracking-wider">
+                                          {key}
+                                        </span>
+                                        {isFile ? (
+                                          <span className="text-xs text-indigo-600 font-medium truncate block max-w-[170px]" title={val.split('/').pop()}>
+                                            {val.split('/').pop()}
+                                          </span>
+                                        ) : (
+                                          <span className="text-xs font-semibold text-slate-700 block truncate max-w-[170px]" title={String(val)}>
+                                            {String(val)}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {isFile && (
+                                        <a
+                                          href={val}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-md font-semibold transition-colors shrink-0 flex items-center gap-1"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          View File
+                                        </a>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-slate-400 italic">No custom fields filled for this dealer.</p>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
@@ -266,6 +491,103 @@ const DealersPage = () => {
             </CardHeader>
             <CardContent className="pt-6">
               <form onSubmit={handleAddDealer} className="space-y-4">
+                
+                {/* Dynamic Google Forms Builder Card */}
+                <div className="bg-slate-55 p-3 rounded-lg border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5 uppercase tracking-wider">
+                      <SlidersHorizontal className="w-4 h-4 text-indigo-500" />
+                      Add Custom Field
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowFieldBuilder(!showFieldBuilder)}
+                      className="text-xs h-7 px-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50 flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      {showFieldBuilder ? 'Close Builder' : 'New Field'}
+                    </Button>
+                  </div>
+
+                  {showFieldBuilder && (
+                    <div className="bg-white p-3 rounded-md border border-slate-100 shadow-xs space-y-3 animate-in fade-in duration-200">
+                      <div className="space-y-1">
+                        <Label htmlFor="customFieldName" className="text-xs font-semibold text-slate-600">Field Name</Label>
+                        <Input
+                          id="customFieldName"
+                          placeholder="e.g. License Attachment"
+                          value={newFieldName}
+                          onChange={(e) => setNewFieldName(e.target.value)}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label htmlFor="customFieldType" className="text-xs font-semibold text-slate-600">Type</Label>
+                          <select
+                            id="customFieldType"
+                            value={newFieldType}
+                            onChange={(e) => setNewFieldType(e.target.value as any)}
+                            className="w-full h-8 px-2 bg-white border border-slate-200 rounded text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                          >
+                            <option value="text">Alphabet / Text</option>
+                            <option value="number">Numeric</option>
+                            <option value="file">File / Image Upload</option>
+                          </select>
+                        </div>
+                        <div className="flex items-center space-x-2 pt-6">
+                          <input
+                            type="checkbox"
+                            id="customFieldRequired"
+                            checked={newFieldRequired}
+                            onChange={(e) => setNewFieldRequired(e.target.checked)}
+                            className="rounded border-slate-350 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                          />
+                          <Label htmlFor="customFieldRequired" className="text-xs font-semibold text-slate-600 select-none cursor-pointer">
+                            Required
+                          </Label>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={handleCreateCustomField}
+                        disabled={savingField}
+                        className="w-full h-8 bg-indigo-600 hover:bg-indigo-750 text-white text-xs font-semibold rounded transition-colors"
+                      >
+                        {savingField ? 'Adding Field...' : 'Save Field Template'}
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Render list of defined fields */}
+                  {customFieldDefs.length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Configured Fields</p>
+                      <div className="flex flex-wrap gap-1">
+                        {customFieldDefs.map((fdef) => (
+                          <span
+                            key={fdef.id}
+                            className="inline-flex items-center gap-1 bg-white border border-slate-200 pl-2 pr-1 py-0.5 rounded text-[10.5px] font-medium text-slate-600 shadow-2xs"
+                          >
+                            <span>{fdef.name}</span>
+                            <span className="text-[8.5px] text-indigo-500 font-mono">({fdef.field_type})</span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCustomField(fdef.id, fdef.name)}
+                              className="text-slate-400 hover:text-red-650 transition-colors ml-1 font-bold text-xs"
+                              title="Delete Field"
+                            >
+                              &times;
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Category Selector */}
                 <div className="space-y-2">
                   <Label htmlFor="dealerCategory" className="text-sm font-medium text-gray-700">
@@ -371,6 +693,91 @@ const DealersPage = () => {
                   />
                 </div>
 
+                {/* Render Custom Fields dynamically in Dealer Form */}
+                {customFieldDefs.length > 0 && (
+                  <div className="border-t border-slate-100 pt-3.5 space-y-3">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Custom Fields</p>
+                    {customFieldDefs.map((fdef) => {
+                      const val = customValues[fdef.name] || '';
+                      return (
+                        <div key={fdef.id} className="space-y-1.5">
+                          <Label htmlFor={`custom-${fdef.id}`} className="text-xs font-semibold text-slate-700 flex items-center justify-between">
+                            <span>
+                              {fdef.name} {fdef.is_required && <span className="text-red-500">*</span>}
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-mono capitalize">({fdef.field_type})</span>
+                          </Label>
+
+                          {fdef.field_type === 'text' && (
+                            <Input
+                              id={`custom-${fdef.id}`}
+                              placeholder={`Enter ${fdef.name}`}
+                              value={val}
+                              onChange={(e) => setCustomValues(prev => ({ ...prev, [fdef.name]: e.target.value }))}
+                              required={fdef.is_required}
+                              className="h-9 text-xs"
+                            />
+                          )}
+
+                          {fdef.field_type === 'number' && (
+                            <Input
+                              id={`custom-${fdef.id}`}
+                              type="number"
+                              placeholder={`Enter ${fdef.name}`}
+                              value={val}
+                              onChange={(e) => setCustomValues(prev => ({ ...prev, [fdef.name]: e.target.value }))}
+                              required={fdef.is_required}
+                              className="h-9 text-xs"
+                            />
+                          )}
+
+                          {fdef.field_type === 'file' && (
+                            <div className="space-y-1.5">
+                              {val ? (
+                                <div className="flex items-center justify-between bg-indigo-50 border border-indigo-150 p-2 rounded-lg text-xs">
+                                  <span className="font-semibold text-indigo-750 truncate max-w-[180px]">
+                                    {val.split('/').pop()}
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setCustomValues(prev => {
+                                      const copy = { ...prev };
+                                      delete copy[fdef.name];
+                                      return copy;
+                                    })}
+                                    className="h-6 px-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 text-[10px]"
+                                  >
+                                    Clear
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    id={`custom-${fdef.id}`}
+                                    type="file"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleCustomFileUpload(fdef.name, file);
+                                    }}
+                                    required={fdef.is_required}
+                                    disabled={uploadingField === fdef.name}
+                                    className="text-xs h-9 cursor-pointer"
+                                  />
+                                  {uploadingField === fdef.name && (
+                                    <span className="animate-spin h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full shrink-0"></span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 <Button
                   type="submit"
                   disabled={submitting}
@@ -425,7 +832,7 @@ const DealersPage = () => {
                       Scrap Dealers ({scrapDealers.length})
                     </TabsTrigger>
                   </TabsList>
-                  
+
                   <div className="flex-1">
                     <TabsContent value="sub_contractors" className="mt-0">
                       {renderDealerTable(subContractors, "Sub Contractors")}
