@@ -9,6 +9,8 @@ class UserBase(SQLModel):
     role: str = "worker" # admin, store, inspector, management, worker, data_entry
     site: Optional[str] = None
     phone: Optional[str] = None
+    company_name: Optional[str] = None
+    gst_number: Optional[str] = None
     status: str = "active"
 
 class User(UserBase, table=True):
@@ -25,6 +27,8 @@ class UserUpdate(SQLModel):
     role: Optional[str] = None
     site: Optional[str] = None
     phone: Optional[str] = None
+    company_name: Optional[str] = None
+    gst_number: Optional[str] = None
     password: Optional[str] = None
     status: Optional[str] = None
 
@@ -136,11 +140,13 @@ class InspectionBase(SQLModel):
     remarks: Optional[str] = None
     photos: Optional[str] = None # Comma separated URLs or JSON string
     inspector_id: int = Field(foreign_key="user.id")
+    inspector_employee_id: Optional[int] = Field(default=None, foreign_key="inspector.id")
 
 class Inspection(InspectionBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     tool: Optional[Tool] = Relationship(back_populates="inspections")
     inspector: Optional[User] = Relationship()
+    inspector_employee: Optional["Inspector"] = Relationship()
 
 class InspectionCreate(InspectionBase):
     inspector_id: Optional[int] = None

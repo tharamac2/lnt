@@ -15,6 +15,7 @@ import ToolsMovementHistory from "./pages/ToolsMovementHistory";
 import InspectorView from "./pages/InspectorView";
 import InspectionResults from "./pages/InspectionResults";
 import InspectorEmployeeProfile from "./pages/InspectorEmployeeProfile";
+import InspectorProfile from "./pages/InspectorProfile";
 import Dashboard from "./pages/Dashboard";
 import WorkerView from "./pages/WorkerView";
 import SplitToolMatching from "./pages/SplitToolMatching";
@@ -141,6 +142,7 @@ function App() {
           {user.role === "inspector" && (
             <>
               <Route path="/" element={<Navigate to="/inspector" replace />} />
+              <Route path="/inspector/profile" element={<InspectorProfile />} />
               <Route path="/inspector" element={<InspectorView />} />
               <Route path="/inspector/results" element={<InspectionResults />} />
               <Route path="/inspector/add-employee" element={<InspectorEmployeeProfile />} />

@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 from sqlmodel import Session, select
+from sqlalchemy.orm import joinedload
 from ..database import get_session
-from ..models import Inspector, InspectorCreate, InspectorRead, User
+from ..models import Inspector, InspectorCreate, InspectorRead, User, Inspection, InspectionReadWithTool
 from ..auth import get_current_user, get_password_hash
 from ..audit import log_action
 from .. import email_utils
@@ -70,6 +71,27 @@ def read_my_inspectors(
 
     statement = select(Inspector).where(Inspector.created_by_id == current_user.id).order_by(Inspector.created_at.desc())
     return session.exec(statement).all()
+
+@router.get("/{inspector_id}/inspections", response_model=List[InspectionReadWithTool])
+def read_inspector_inspections(
+    inspector_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    if not isinstance(current_user, User) or current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized to view employee inspections")
+
+    inspector = session.get(Inspector, inspector_id)
+    if not inspector:
+        raise HTTPException(status_code=404, detail="Employee record not found")
+
+    statement = (
+        select(Inspection)
+        .options(joinedload(Inspection.tool), joinedload(Inspection.inspector))
+        .where(Inspection.inspector_employee_id == inspector_id)
+        .order_by(Inspection.date.desc())
+    )
+    return session.exec(statement).unique().all()
 
 @router.patch("/{inspector_id}/verify", response_model=InspectorRead)
 def verify_inspector(
