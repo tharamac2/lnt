@@ -35,6 +35,28 @@ class UserUpdate(SQLModel):
 class UserRead(UserBase):
     id: int
 
+class ToolConfigBase(SQLModel):
+    tool_name: str = Field(index=True, unique=True)
+    item_code: str
+    is_verified: bool = Field(default=False)
+
+class ToolConfig(ToolConfigBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+class ToolConfigCreate(SQLModel):
+    tool_name: str
+    item_code: str
+    is_verified: Optional[bool] = False
+
+class ToolConfigRead(ToolConfigBase):
+    id: int
+
+class ToolConfigUpdate(SQLModel):
+    tool_name: Optional[str] = None
+    item_code: Optional[str] = None
+    is_verified: Optional[bool] = None
+
+
 class ToolBase(SQLModel):
     description: str
     make: str

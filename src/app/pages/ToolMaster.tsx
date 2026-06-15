@@ -65,6 +65,31 @@ const ToolMaster = ({ user }: { user?: User }) => {
   const [savedTools, setSavedTools] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [allSites, setAllSites] = useState<string[]>([]);
+  const [toolConfigs, setToolConfigs] = useState<any[]>([]);
+
+  const dynamicToolCodeMapping = useMemo(() => {
+    const mapping: Record<string, string> = { ...TOOL_CODE_MAPPING };
+    toolConfigs.forEach((config: any) => {
+      mapping[config.tool_name] = config.item_code;
+    });
+    return mapping;
+  }, [toolConfigs]);
+
+  const dynamicToolsList = useMemo(() => {
+    return Object.keys(dynamicToolCodeMapping);
+  }, [dynamicToolCodeMapping]);
+
+  useEffect(() => {
+    const fetchToolConfigs = async () => {
+      try {
+        const res = await api.get('/toolconfig/?verified_only=true');
+        setToolConfigs(res.data);
+      } catch (err) {
+        console.error("Failed to fetch tool configurations", err);
+      }
+    };
+    fetchToolConfigs();
+  }, []);
 
   // Tab switching effect
   useEffect(() => {
@@ -964,15 +989,15 @@ const ToolMaster = ({ user }: { user?: User }) => {
                     <Label htmlFor="description">Tool Name <span className="text-red-600">*</span></Label>
                     <Select value={toolData.description} onValueChange={(value) => {
                       handleInputChange('description', value);
-                      if (TOOL_CODE_MAPPING[value]) {
-                        handleInputChange('itemCode', TOOL_CODE_MAPPING[value]);
+                      if (dynamicToolCodeMapping[value]) {
+                        handleInputChange('itemCode', dynamicToolCodeMapping[value]);
                       }
                     }} required>
                       <SelectTrigger className={errors.description ? 'border-red-500' : ''}>
                         <SelectValue placeholder="Select tool Name" />
                       </SelectTrigger>
                       <SelectContent className="max-h-[300px]">
-                        {TOOLS_LIST.map((tool) => (
+                        {dynamicToolsList.map((tool) => (
                           <SelectItem key={tool} value={tool}>{tool}</SelectItem>
                         ))}
                       </SelectContent>

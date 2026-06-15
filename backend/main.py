@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .database import create_db_and_tables
-from .routes import users, tools, inspections, alerts, upload, movements, export, audit, inspectors
+from .routes import users, tools, inspections, alerts, upload, movements, export, audit, inspectors, toolconfig
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="QR Code Tools Management API")
@@ -38,6 +38,7 @@ app.include_router(movements.router, prefix="/api")
 app.include_router(export.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
 app.include_router(inspectors.router, prefix="/api")
+app.include_router(toolconfig.router, prefix="/api")
 
 @app.get("/system/ip")
 def get_local_ip():

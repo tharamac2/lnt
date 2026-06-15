@@ -12,7 +12,7 @@ import zipfile
 from PIL import Image, ImageDraw, ImageFont
 from sqlmodel import Session, select
 from ..database import get_session
-from ..models import Tool, User, Alert
+from ..models import Tool, User, Alert, ToolConfig
 from ..auth import get_current_user
 router = APIRouter(prefix="/upload", tags=["upload"])
 
@@ -217,6 +217,34 @@ async def upload_tools(
             location_val = row.get('location')
             location = str(location_val).strip() if pd.notna(location_val) and str(location_val).strip() else 'Store'
 
+            # Look up item_code based on description (tool name)
+            item_code = None
+            item_code_val = row.get('item_code') if 'item_code' in row else row.get('itemcode', None)
+            if item_code_val and pd.notna(item_code_val) and str(item_code_val).strip():
+                item_code = str(item_code_val).strip()
+            else:
+                tool_config = session.exec(select(ToolConfig).where(ToolConfig.tool_name == description)).first()
+                if tool_config:
+                    item_code = tool_config.item_code
+                else:
+                    FALLBACK_TOOL_CODE_MAPPING = {
+                        "SINGLE SHEAVE OPEN PULLY": "1SETM0004000000",
+                        "SINGLE SHEAVE CLOSE PULLY": "1SETM0005000000",
+                        "DOUBLE SHEAVE PULLEY": "1SETM003G000000",
+                        "D SHACKLE 4.5T": "2T11M0GFO000000",
+                        "D SHACKLE 6.5T": "2T11M0K39000000",
+                        "D SHACKLE 9.5T": "2T11M04UG000000",
+                        "D SHACKLE 8.5T": "2T11M063H000000",
+                        "STEEL WIRE SLING 1M": "2T11M0IQX000000",
+                        "STEEL WIRE SLING 2M": "2T11M0KNY000000",
+                        "STEEL WIRE SLING 6M": "2T11M04BW000000",
+                        "WIRE ROPE 4000M": "1SETM005E000000",
+                        "DIRRECK POLE": "1SETM0002000000",
+                        "4 BOLT CLAMP": "1SETM004B000000",
+                        "D SHACKLE 17 T": "2T11MO5V3000000",
+                    }
+                    item_code = FALLBACK_TOOL_CODE_MAPPING.get(description)
+
             db_tool = Tool(
                 description=description,
                 make=make,
@@ -228,6 +256,7 @@ async def upload_tools(
                 purchaser_name=purchaser,
                 purchaser_contact=str(row.get('purchaser_contact', None)) if row.get('purchaser_contact') else None,
                 supplier_code=supplier_code,
+                item_code=item_code,
                 job_code=str(row.get('job_code', None)) if row.get('job_code') else None,
                 job_description=str(row.get('job_description', None)) if row.get('job_description') else None,
                 current_site=location,
