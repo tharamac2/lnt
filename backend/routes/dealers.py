@@ -291,6 +291,18 @@ async def bulk_import_dealers(
             gst_col = col
             break
 
+    products_services_col = None
+    for col in df.columns:
+        if col in ('products_services', 'products/services', 'products', 'services'):
+            products_services_col = col
+            break
+
+    status_col = None
+    for col in df.columns:
+        if col in ('status', 'dealer_status'):
+            status_col = col
+            break
+
     if not category_col or not name_col or not company_col or not code_col:
         raise HTTPException(
             status_code=400,
@@ -327,6 +339,12 @@ async def bulk_import_dealers(
             contact_number = str(row.get(phone_col) or "").strip() if row.get(phone_col) else None
             address = str(row.get(address_col) or "").strip() if row.get(address_col) else None
             gst_number = str(row.get(gst_col) or "").strip() if row.get(gst_col) else None
+            products_services = str(row.get(products_services_col) or "").strip() if row.get(products_services_col) else None
+
+            status = "active"
+            if status_col and row.get(status_col):
+                raw_status = str(row.get(status_col)).strip().lower()
+                status = "inactive" if raw_status in ("inactive", "in-active", "no", "0") else "active"
 
             # Check uniqueness
             stmt = select(Dealer).where(Dealer.dealer_code == dealer_code)
@@ -362,6 +380,8 @@ async def bulk_import_dealers(
                 contact_number=contact_number,
                 address=address,
                 gst_number=gst_number,
+                products_services=products_services,
+                status=status,
                 custom_fields=custom_fields_str
             )
             session.add(db_dealer)
