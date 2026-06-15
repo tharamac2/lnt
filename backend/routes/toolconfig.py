@@ -181,6 +181,7 @@ def delete_tool_config(
     stmt = select(Tool).where(Tool.description == db_config.tool_name, Tool.is_deleted == False)
     matching_tools = session.exec(stmt).all()
     deleted_tools_count = len(matching_tools)
+    hard_deleted_qr_codes = []
     for t in matching_tools:
         if t.is_printed:
             # Soft delete
@@ -210,16 +211,30 @@ def delete_tool_config(
                 session.delete(mov)
 
             # Delete tool
-            qr_to_resequence = t.qr_code
+            hard_deleted_qr_codes.append(t.qr_code)
             session.delete(t)
             log_action(
                 session, current_user, "delete", "Tool", t.id,
                 f"Hard-deleted unprinted tool {t.description} ({t.qr_code}) due to config deletion cascade",
                 site=t.current_site,
             )
-            resequence_unprinted_tools(session, qr_to_resequence)
 
-    # 2. Delete the configuration entry
+    # 2. Resequence unprinted tools database-wide once after all hard deletions are processed
+    if hard_deleted_qr_codes:
+        min_qr_code = None
+        min_serial = None
+        for qr in hard_deleted_qr_codes:
+            if qr and len(qr) >= 4:
+                suffix = qr[-4:]
+                if suffix.isdigit():
+                    serial = int(suffix)
+                    if min_serial is None or serial < min_serial:
+                        min_serial = serial
+                        min_qr_code = qr
+        if min_qr_code:
+            resequence_unprinted_tools(session, min_qr_code)
+
+    # 3. Delete the configuration entry
     session.delete(db_config)
     session.commit()
 
