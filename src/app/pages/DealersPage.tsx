@@ -803,18 +803,33 @@ const DealersPage = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="dealerStatus" className="text-sm font-medium text-gray-700">
+                  <Label className="text-sm font-medium text-gray-700">
                     Status
                   </Label>
-                  <select
-                    id="dealerStatus"
-                    value={dealerStatus}
-                    onChange={(e) => setDealerStatus(e.target.value)}
-                    className="w-full h-10 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
+                  <div className="flex items-center gap-6 h-10">
+                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="dealerStatus"
+                        value="active"
+                        checked={dealerStatus === 'active'}
+                        onChange={() => setDealerStatus('active')}
+                        className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      Active
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="dealerStatus"
+                        value="inactive"
+                        checked={dealerStatus === 'inactive'}
+                        onChange={() => setDealerStatus('inactive')}
+                        className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      Inactive
+                    </label>
+                  </div>
                 </div>
 
                 {/* Render Custom Fields dynamically in Dealer Form */}
