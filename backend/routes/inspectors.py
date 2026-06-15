@@ -48,18 +48,21 @@ def read_inspectors(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    if not isinstance(current_user, User) or current_user.role != "admin":
+    if not isinstance(current_user, User) or current_user.role not in ("admin", "store"):
         raise HTTPException(status_code=403, detail="Not authorized to view employee records")
 
     statement = select(Inspector).order_by(Inspector.created_at.desc())
     inspectors = session.exec(statement).all()
-    return [
+    results = [
         {
             **InspectorRead.from_orm(inspector).dict(),
             "site": inspector.creator.site if inspector.creator else None,
         }
         for inspector in inspectors
     ]
+    if current_user.role == "store":
+        results = [r for r in results if r["site"] == current_user.site]
+    return results
 
 @router.get("/me", response_model=List[InspectorRead])
 def read_my_inspectors(
@@ -78,12 +81,15 @@ def read_inspector_inspections(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    if not isinstance(current_user, User) or current_user.role != "admin":
+    if not isinstance(current_user, User) or current_user.role not in ("admin", "store"):
         raise HTTPException(status_code=403, detail="Not authorized to view employee inspections")
 
     inspector = session.get(Inspector, inspector_id)
     if not inspector:
         raise HTTPException(status_code=404, detail="Employee record not found")
+
+    if current_user.role == "store" and (not inspector.creator or inspector.creator.site != current_user.site):
+        raise HTTPException(status_code=403, detail="Not authorized to view employee inspections")
 
     statement = (
         select(Inspection)
@@ -99,12 +105,15 @@ def verify_inspector(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
+    if current_user.role not in ("admin", "store"):
         raise HTTPException(status_code=403, detail="Not authorized to verify employees")
 
     inspector = session.get(Inspector, inspector_id)
     if not inspector:
         raise HTTPException(status_code=404, detail="Employee record not found")
+
+    if current_user.role == "store" and (not inspector.creator or inspector.creator.site != current_user.site):
+        raise HTTPException(status_code=403, detail="Not authorized to verify employees")
 
     inspector.status = "verified"
     session.add(inspector)
@@ -123,12 +132,15 @@ def unverify_inspector(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
+    if current_user.role not in ("admin", "store"):
         raise HTTPException(status_code=403, detail="Not authorized to update employees")
 
     inspector = session.get(Inspector, inspector_id)
     if not inspector:
         raise HTTPException(status_code=404, detail="Employee record not found")
+
+    if current_user.role == "store" and (not inspector.creator or inspector.creator.site != current_user.site):
+        raise HTTPException(status_code=403, detail="Not authorized to update employees")
 
     inspector.status = "pending"
     session.add(inspector)

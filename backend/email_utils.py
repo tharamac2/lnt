@@ -110,6 +110,74 @@ def send_otp_email(to_email: str) -> str:
     return otp
 
 
+BACKUP_EMAIL_HTML_TEMPLATE = """\
+<html>
+  <body style="margin:0; padding:0; background-color:#f1f5f9; font-family:Arial, Helvetica, sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9; padding:24px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+            <tr>
+              <td align="center" style="background-color:#1E3A8A; padding:20px;">
+                <img src="cid:lt_logo" alt="L&T Construction" style="height:40px;" />
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px 32px 16px 32px;">
+                <h2 style="margin:0 0 8px 0; color:#0F172A;">Data Backup</h2>
+                <p style="color:#475569; font-size:14px; line-height:1.5; margin:0 0 24px 0;">
+                  A backup of your QR Tools Management System data was generated on {timestamp}.
+                  The full export is attached to this email as a PDF.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px 24px 32px; border-top:1px solid #E2E8F0;">
+                <p style="color:#94A3B8; font-size:12px; margin:0;">QR Tools Management System &middot; L&amp;T Construction</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+"""
+
+
+def send_backup_email(to_email: str, pdf_bytes: bytes, filename: str) -> None:
+    """Email a generated data-backup PDF as an attachment to the given address."""
+    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+
+    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
+        print(f"DEV MODE: Backup email to {to_email} skipped (email not configured). File: {filename}")
+        return
+
+    msg = EmailMessage()
+    msg["Subject"] = "Data Backup - QR Tools Management"
+    msg["From"] = GMAIL_USER
+    msg["To"] = to_email
+    msg.set_content(
+        f"A backup of your QR Tools Management System data was generated on {timestamp}.\n"
+        "The full export is attached to this email as a PDF."
+    )
+
+    html = BACKUP_EMAIL_HTML_TEMPLATE.format(timestamp=timestamp)
+    msg.add_alternative(html, subtype="html")
+
+    if os.path.isfile(LOGO_PATH):
+        with open(LOGO_PATH, "rb") as f:
+            logo_data = f.read()
+        msg.get_payload()[1].add_related(logo_data, maintype="image", subtype="png", cid="lt_logo")
+
+    msg.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename=filename)
+
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.starttls()
+        server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+        server.send_message(msg)
+
+
 def verify_otp(email: str, otp: str) -> bool:
     record = _otp_store.get(email)
     if not record:

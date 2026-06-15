@@ -245,6 +245,7 @@ export default function Reports() {
                                             <SelectContent>
                                                 <SelectItem value="all">All</SelectItem>
                                                 <SelectItem value="usable">Usable</SelectItem>
+                                                <SelectItem value="under-repair">Under Repair</SelectItem>
                                                 <SelectItem value="scrap">Scrap</SelectItem>
                                             </SelectContent>
                                         </Select>
@@ -275,7 +276,7 @@ export default function Reports() {
                                             <TableCell>{tool.subcontractor_name || '-'}</TableCell>
                                             <TableCell>{tool.current_site || '-'}</TableCell>
                                             <TableCell>
-                                                <span className={`px-2 py-1 rounded text-xs font-semibold capitalize ${tool.status === 'usable' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                                <span className={`px-2 py-1 rounded text-xs font-semibold capitalize ${tool.status === 'usable' ? 'bg-green-100 text-green-700' : tool.status === 'under-repair' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
                                                     }`}>
                                                     {tool.status}
                                                 </span>

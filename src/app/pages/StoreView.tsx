@@ -56,6 +56,7 @@ const StoreView = () => {
     switch (status) {
       case 'usable': return 'bg-[#16A34A] text-white';
       case 'scrap': return 'bg-red-100 text-red-700';
+      case 'under-repair': return 'bg-amber-100 text-amber-700';
       case 'missing': return 'bg-orange-100 text-orange-700';
       case 'stolen': return 'bg-red-900 text-white';
       case 'scrapped': return 'bg-neutral-800 text-white';

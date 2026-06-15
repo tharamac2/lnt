@@ -4,6 +4,7 @@ from sqlmodel import Session, select
 from ..database import get_session
 from ..models import User, Tool, Inspection, Alert, MovementHistory
 from ..auth import get_current_user
+from .. import email_utils
 from datetime import datetime, timedelta
 import io
 from reportlab.lib import colors
@@ -26,11 +27,7 @@ def get_table_style():
         ('FONTSIZE', (0, 0), (-1, -1), 8),
     ])
 
-@router.get("/full-data-pdf")
-def export_full_data_pdf(
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
-):
+def build_full_data_pdf(session: Session, current_user: User) -> tuple[bytes, str]:
     # 1. Fetch Data (Last 1 Year for transactional data)
     now = datetime.now()
     one_year_ago = now - timedelta(days=365)
@@ -169,11 +166,33 @@ def export_full_data_pdf(
 
     doc.build(elements)
     buffer.seek(0)
-    
+
     filename = f"System_Export_{now.strftime('%Y%m%d_%H%M')}.pdf"
-    
+    return buffer.read(), filename
+
+
+@router.get("/full-data-pdf")
+def export_full_data_pdf(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    pdf_bytes, filename = build_full_data_pdf(session, current_user)
+
     return StreamingResponse(
-        buffer, 
-        media_type="application/pdf", 
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+
+@router.post("/email-backup")
+def email_data_backup(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized to create backups")
+
+    pdf_bytes, filename = build_full_data_pdf(session, current_user)
+    email_utils.send_backup_email(current_user.email, pdf_bytes, filename)
+    return {"ok": True, "sent_to": current_user.email}

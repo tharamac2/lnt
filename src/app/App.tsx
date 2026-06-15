@@ -135,6 +135,7 @@ function App() {
               <Route path="/store-inventory" element={<StoreInventory />} />
               <Route path="/tools-movements" element={<ToolsMovements />} />
               <Route path="/tools-movement-history" element={<ToolsMovementHistory />} />
+              <Route path="/inspection-employees" element={<InspectionEmployees />} />
             </>
           )}
 
