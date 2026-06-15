@@ -142,6 +142,12 @@ const navItems: NavItem[] = [
     roles: ['admin', 'management'],
   },
   {
+    path: '/dealers',
+    label: 'Add Dealers',
+    icon: <Truck className="w-5 h-5" />,
+    roles: ['admin'],
+  },
+  {
     path: '/users',
     label: 'User Management',
     icon: <Users className="w-5 h-5" />,

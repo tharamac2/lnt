@@ -26,6 +26,7 @@ import SettingsPage from "./pages/SettingsPage";
 import AuditLog from "./pages/AuditLog";
 import InspectionEmployees from "./pages/InspectionEmployees";
 import ToolConfigPage from "./pages/ToolConfigPage";
+import DealersPage from "./pages/DealersPage";
 import ViewTool from "./pages/ViewTool";
 import SplashScreen from "./components/SplashScreen";
 import { Toaster } from "./components/ui/sonner";
@@ -123,6 +124,7 @@ function App() {
               <Route path="/audit-log" element={<AuditLog />} />
               <Route path="/inspection-employees" element={<InspectionEmployees />} />
               <Route path="/tool-config" element={<ToolConfigPage />} />
+              <Route path="/dealers" element={<DealersPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </>
           )}

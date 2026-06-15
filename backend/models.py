@@ -251,3 +251,33 @@ class InspectorUpdate(SQLModel):
     department: Optional[str] = None
     contact_number: Optional[str] = None
     status: Optional[str] = None
+
+
+class DealerBase(SQLModel):
+    category: str = Field(index=True) # sub_contractor, supplier, scrap_dealer
+    name: str = Field(index=True)
+    company_name: str
+    dealer_code: str = Field(index=True, unique=True)
+    email: Optional[str] = None
+    contact_number: Optional[str] = None
+    address: Optional[str] = None
+    gst_number: Optional[str] = None
+
+class Dealer(DealerBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+class DealerCreate(DealerBase):
+    pass
+
+class DealerRead(DealerBase):
+    id: int
+
+class DealerUpdate(SQLModel):
+    category: Optional[str] = None
+    name: Optional[str] = None
+    company_name: Optional[str] = None
+    dealer_code: Optional[str] = None
+    email: Optional[str] = None
+    contact_number: Optional[str] = None
+    address: Optional[str] = None
+    gst_number: Optional[str] = None
