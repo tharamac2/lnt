@@ -338,7 +338,7 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
       <div className="flex flex-1">
         {/* Sidebar - Desktop */}
         <aside
-          className={`hidden lg:flex flex-col bg-white border-r border-gray-200 transition-all duration-300 shrink-0 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto ${sidebarOpen ? 'w-64' : 'w-20'
+          className={`hidden lg:flex flex-col bg-white border-r border-gray-200 transition-all duration-300 shrink-0 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto scrollbar-hide ${sidebarOpen ? 'w-64' : 'w-20'
             }`}
         >
           <nav className="p-4 space-y-1 flex-1">
@@ -370,7 +370,7 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
         {/* Sidebar - Mobile */}
         {mobileMenuOpen && (
           <div className="lg:hidden fixed inset-0 z-40 bg-black bg-opacity-50" onClick={() => setMobileMenuOpen(false)}>
-            <aside className="w-64 bg-white h-full flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <aside className="w-64 bg-white h-full flex flex-col overflow-y-auto scrollbar-hide" onClick={(e) => e.stopPropagation()}>
               <nav className="p-4 space-y-1 flex-1">
                 {filteredNavItems.map((item) => {
                   const isActive = location.pathname === item.path;
