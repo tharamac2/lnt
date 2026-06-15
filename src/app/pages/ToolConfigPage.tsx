@@ -1,19 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
-import { Wrench, Sliders, Trash2, Search, PlusCircle, AlertCircle, FileSpreadsheet, CheckCircle2, Upload } from 'lucide-react';
+import { Wrench, Sliders, Trash2, Search, PlusCircle, AlertCircle, FileSpreadsheet, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../services/api';
+
+interface ToolInConfig {
+  id: number;
+  qr_code: string;
+  is_printed: boolean;
+  current_site: string | null;
+  status: string;
+}
 
 interface ToolConfig {
   id: number;
   tool_name: string;
   item_code: string;
   is_verified: boolean;
+  tools: ToolInConfig[];
+  has_printed_tools: boolean;
 }
 
 const ToolConfigPage = () => {
@@ -23,6 +33,7 @@ const ToolConfigPage = () => {
   const [toolName, setToolName] = useState('');
   const [itemCode, setItemCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [expandedRowIds, setExpandedRowIds] = useState<number[]>([]);
 
   // Verification & Import States
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -85,7 +96,15 @@ const ToolConfigPage = () => {
       fetchConfigs();
     } catch (error: any) {
       console.error('Failed to delete tool configuration', error);
-      toast.error('Failed to delete tool configuration');
+      toast.error(error.response?.data?.detail || 'Failed to delete tool configuration');
+    }
+  };
+
+  const toggleRow = (id: number) => {
+    if (expandedRowIds.includes(id)) {
+      setExpandedRowIds(prev => prev.filter(rId => rId !== id));
+    } else {
+      setExpandedRowIds(prev => [...prev, id]);
     }
   };
 
@@ -328,6 +347,7 @@ const ToolConfigPage = () => {
                             onChange={(e) => handleSelectAll(e.target.checked)}
                           />
                         </TableHead>
+                        <TableHead className="w-[40px]"></TableHead>
                         <TableHead className="w-[60px] font-semibold text-gray-600">S.No</TableHead>
                         <TableHead className="font-semibold text-gray-600">Tool Name</TableHead>
                         <TableHead className="font-semibold text-gray-600">Item Code</TableHead>
@@ -338,43 +358,139 @@ const ToolConfigPage = () => {
                     <TableBody>
                       {filteredConfigs.map((config, index) => {
                         const isSelected = selectedIds.includes(config.id);
+                        const isExpanded = expandedRowIds.includes(config.id);
                         return (
-                          <TableRow key={config.id} className={`hover:bg-gray-50/50 transition-colors ${isSelected ? 'bg-blue-50/30' : ''}`}>
-                            <TableCell>
-                              <input
-                                type="checkbox"
-                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-4 w-4"
-                                checked={isSelected}
-                                onChange={(e) => handleSelectRow(config.id, e.target.checked)}
-                              />
-                            </TableCell>
-                            <TableCell className="font-medium text-gray-500">{index + 1}</TableCell>
-                            <TableCell className="font-semibold text-gray-800">{config.tool_name}</TableCell>
-                            <TableCell className="font-mono text-xs text-blue-600 font-medium">{config.item_code}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={config.is_verified ? 'success' : 'warning'}
-                                className={
-                                  config.is_verified
-                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                                    : 'bg-amber-100 text-amber-800 border-amber-200'
-                                }
-                              >
-                                {config.is_verified ? 'Verified' : 'Pending'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteConfig(config.id, config.tool_name)}
-                                className="text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
-                                title="Delete Configuration"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
+                          <Fragment key={config.id}>
+                            <TableRow className={`hover:bg-gray-50/50 transition-colors ${isSelected ? 'bg-blue-50/30' : ''}`}>
+                              <TableCell>
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-4 w-4"
+                                  checked={isSelected}
+                                  onChange={(e) => handleSelectRow(config.id, e.target.checked)}
+                                />
+                              </TableCell>
+                              <TableCell className="p-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => toggleRow(config.id)}
+                                  className="h-8 w-8 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full"
+                                  title="View Associated Tools"
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown className="w-4 h-4 text-blue-600" />
+                                  ) : (
+                                    <ChevronRight className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              </TableCell>
+                              <TableCell className="font-medium text-gray-500">{index + 1}</TableCell>
+                              <TableCell className="font-semibold text-gray-800">{config.tool_name}</TableCell>
+                              <TableCell className="font-mono text-xs text-blue-600 font-medium">{config.item_code}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={config.is_verified ? 'success' : 'warning'}
+                                  className={
+                                    config.is_verified
+                                      ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                      : 'bg-amber-100 text-amber-800 border-amber-200'
+                                  }
+                                >
+                                  {config.is_verified ? 'Verified' : 'Pending'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDeleteConfig(config.id, config.tool_name)}
+                                  disabled={config.has_printed_tools}
+                                  className={`${
+                                    config.has_printed_tools
+                                      ? 'text-gray-300 cursor-not-allowed hover:bg-transparent'
+                                      : 'text-red-500 hover:text-red-700 hover:bg-red-50'
+                                  } transition-colors`}
+                                  title={
+                                    config.has_printed_tools
+                                      ? 'Cannot delete configuration: matching tools have been printed'
+                                      : 'Delete Configuration'
+                                  }
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                            {isExpanded && (
+                              <TableRow className="bg-gray-50/40 hover:bg-gray-50/40">
+                                <TableCell colSpan={7} className="p-4">
+                                  <div className="pl-12 pr-6 py-4 bg-white border border-gray-100 rounded-lg shadow-sm">
+                                    <div className="flex items-center justify-between mb-3">
+                                      <h4 className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                                        <Wrench className="w-3.5 h-3.5 text-blue-600" />
+                                        Associated Tools ({config.tools?.length || 0})
+                                      </h4>
+                                      {config.has_printed_tools && (
+                                        <Badge className="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] py-0 px-2 font-normal">
+                                          Contains Printed Tools (Deletion Blocked)
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {!config.tools || config.tools.length === 0 ? (
+                                      <p className="text-xs text-gray-400 italic pl-5">No tools generated yet for this configuration.</p>
+                                    ) : (
+                                      <div className="overflow-x-auto rounded-md border border-gray-100">
+                                        <Table className="min-w-full">
+                                          <TableHeader className="bg-gray-50/60">
+                                            <TableRow>
+                                              <TableHead className="py-2 text-[10px] font-semibold text-gray-500 w-[60px]">S.No</TableHead>
+                                              <TableHead className="py-2 text-[10px] font-semibold text-gray-500">QR Code</TableHead>
+                                              <TableHead className="py-2 text-[10px] font-semibold text-gray-500">Location</TableHead>
+                                              <TableHead className="py-2 text-[10px] font-semibold text-gray-500">Status</TableHead>
+                                              <TableHead className="py-2 text-[10px] font-semibold text-gray-500 w-[100px]">Printed</TableHead>
+                                            </TableRow>
+                                          </TableHeader>
+                                          <TableBody>
+                                            {config.tools.map((tool, idx) => (
+                                              <TableRow key={tool.id} className="hover:bg-gray-50/20">
+                                                <TableCell className="py-1.5 text-xs text-gray-500">{idx + 1}</TableCell>
+                                                <TableCell className="py-1.5 text-xs font-mono font-medium text-gray-800">{tool.qr_code}</TableCell>
+                                                <TableCell className="py-1.5 text-xs text-gray-600">{tool.current_site || '-'}</TableCell>
+                                                <TableCell className="py-1.5 text-xs">
+                                                  <Badge
+                                                    variant={tool.status === 'usable' ? 'success' : 'destructive'}
+                                                    className={`text-[9px] px-1.5 py-0 ${
+                                                      tool.status === 'usable'
+                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-50'
+                                                        : 'bg-red-50 text-red-700 border-red-100 hover:bg-red-50'
+                                                    }`}
+                                                  >
+                                                    {tool.status}
+                                                  </Badge>
+                                                </TableCell>
+                                                <TableCell className="py-1.5 text-xs">
+                                                  <Badge
+                                                    variant={tool.is_printed ? 'success' : 'secondary'}
+                                                    className={`text-[9px] px-1.5 py-0 ${
+                                                      tool.is_printed
+                                                        ? 'bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-50'
+                                                        : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-50'
+                                                    }`}
+                                                  >
+                                                    {tool.is_printed ? 'Printed' : 'Unprinted'}
+                                                  </Badge>
+                                                </TableCell>
+                                              </TableRow>
+                                            ))}
+                                          </TableBody>
+                                        </Table>
+                                      </div>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </Fragment>
                         );
                       })}
                     </TableBody>

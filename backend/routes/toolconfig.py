@@ -8,13 +8,29 @@ from ..models import ToolConfig, ToolConfigCreate, ToolConfigRead, User, Tool, A
 from ..auth import get_current_user
 from ..audit import log_action
 from pydantic import BaseModel
+from .tools import resequence_unprinted_tools
 
 router = APIRouter(prefix="/toolconfig", tags=["toolconfig"])
 
 class VerifyPayload(BaseModel):
     ids: List[int]
 
-@router.get("/", response_model=List[ToolConfigRead])
+class ToolInConfig(BaseModel):
+    id: int
+    qr_code: str
+    is_printed: bool
+    current_site: Optional[str] = None
+    status: str
+
+class ToolConfigReadWithTools(BaseModel):
+    id: int
+    tool_name: str
+    item_code: str
+    is_verified: bool
+    tools: List[ToolInConfig] = []
+    has_printed_tools: bool = False
+
+@router.get("/", response_model=List[ToolConfigReadWithTools])
 def read_tool_configs(
     verified_only: bool = False,
     session: Session = Depends(get_session),
@@ -24,7 +40,38 @@ def read_tool_configs(
     if verified_only:
         statement = statement.where(ToolConfig.is_verified == True)
     statement = statement.order_by(ToolConfig.tool_name.asc())
-    return session.exec(statement).all()
+    configs = session.exec(statement).all()
+    
+    result = []
+    for cfg in configs:
+        # Fetch active tools for this configuration
+        stmt = select(Tool).where(Tool.description == cfg.tool_name, Tool.is_deleted == False)
+        tools = session.exec(stmt).all()
+        
+        tools_list = [
+            ToolInConfig(
+                id=t.id,
+                qr_code=t.qr_code,
+                is_printed=t.is_printed,
+                current_site=t.current_site,
+                status=t.status
+            )
+            for t in tools
+        ]
+        
+        has_printed = any(t.is_printed for t in tools)
+        
+        result.append(
+            ToolConfigReadWithTools(
+                id=cfg.id,
+                tool_name=cfg.tool_name,
+                item_code=cfg.item_code,
+                is_verified=cfg.is_verified,
+                tools=tools_list,
+                has_printed_tools=has_printed
+            )
+        )
+    return result
 
 @router.post("/", response_model=ToolConfigRead)
 def create_tool_config(
@@ -176,10 +223,24 @@ def delete_tool_config(
     if not db_config:
         raise HTTPException(status_code=404, detail="Tool configuration not found")
 
+    # Check if there are any active printed tools matching this config
+    stmt_printed = select(Tool).where(
+        Tool.description == db_config.tool_name, 
+        Tool.is_deleted == False, 
+        Tool.is_printed == True
+    )
+    printed_tools = session.exec(stmt_printed).all()
+    if printed_tools:
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot delete configuration: matching tools have already been printed."
+        )
+
     # 1. Cascade delete all tools with this description in Tool Master
     stmt = select(Tool).where(Tool.description == db_config.tool_name, Tool.is_deleted == False)
     matching_tools = session.exec(stmt).all()
     deleted_tools_count = len(matching_tools)
+    hard_deleted_qr_codes = []
     for t in matching_tools:
         if t.is_printed:
             # Soft delete
@@ -209,6 +270,7 @@ def delete_tool_config(
                 session.delete(mov)
 
             # Delete tool
+            hard_deleted_qr_codes.append(t.qr_code)
             session.delete(t)
             log_action(
                 session, current_user, "delete", "Tool", t.id,
@@ -216,7 +278,22 @@ def delete_tool_config(
                 site=t.current_site,
             )
 
-    # 2. Delete the configuration entry
+    # 2. Resequence unprinted tools database-wide once after all hard deletions are processed
+    if hard_deleted_qr_codes:
+        min_qr_code = None
+        min_serial = None
+        for qr in hard_deleted_qr_codes:
+            if qr and len(qr) >= 4:
+                suffix = qr[-4:]
+                if suffix.isdigit():
+                    serial = int(suffix)
+                    if min_serial is None or serial < min_serial:
+                        min_serial = serial
+                        min_qr_code = qr
+        if min_qr_code:
+            resequence_unprinted_tools(session, min_qr_code)
+
+    # 3. Delete the configuration entry
     session.delete(db_config)
     session.commit()
 

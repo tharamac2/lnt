@@ -104,6 +104,9 @@ async def upload_tools(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
+    if current_user.role == "data_entry" and not current_user.site:
+        raise HTTPException(status_code=403, detail="No site assigned to this Data Entry user.")
+        
     if not file.filename.endswith(('.xlsx', '.xls', '.pdf')):
         raise HTTPException(status_code=400, detail="Only Excel (.xlsx, .xls) and PDF files are supported.")
     
@@ -214,8 +217,13 @@ async def upload_tools(
                 except ValueError: 
                     expiry_date = datetime(date_of_supply.year + validation_period, date_of_supply.month, 28)
             
-            location_val = row.get('location')
-            location = str(location_val).strip() if pd.notna(location_val) and str(location_val).strip() else 'Store'
+            if current_user.role == "data_entry":
+                if not current_user.site:
+                    raise ValueError("No site assigned to this Data Entry user.")
+                location = current_user.site
+            else:
+                location_val = row.get('location')
+                location = str(location_val).strip() if pd.notna(location_val) and str(location_val).strip() else 'Store'
 
             # Look up item_code based on description (tool name)
             item_code = None
