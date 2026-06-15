@@ -105,6 +105,18 @@ def test_dealers_flow():
     response = client.post("/api/dealers/custom-fields", json=field4_data, headers=headers)
     assert response.status_code == 200
 
+    # Checkboxes Field
+    field5_data = {
+        "name": "Accepted Payment Methods",
+        "field_type": "checkboxes",
+        "is_required": False,
+        "options": "Cash, Bank Transfer, Credit Card"
+    }
+    response = client.post("/api/dealers/custom-fields", json=field5_data, headers=headers)
+    assert response.status_code == 200
+    cf5 = response.json()
+    assert cf5["options"] == "Cash, Bank Transfer, Credit Card"
+
     # Test Duplicate Custom Field Name (Case-insensitive check)
     dup_field_data = {
         "name": "  trade license  ",
@@ -120,7 +132,7 @@ def test_dealers_flow():
     response = client.get("/api/dealers/custom-fields", headers=headers)
     assert response.status_code == 200
     fields_list = response.json()
-    assert len(fields_list) == 4, f"Expected 4 fields, got {len(fields_list)}"
+    assert len(fields_list) == 5, f"Expected 5 fields, got {len(fields_list)}"
     print("Listing custom fields passed")
 
     # Test Update Custom Field
@@ -239,7 +251,7 @@ def test_dealers_flow():
     response = client.get("/api/dealers/custom-fields", headers=headers)
     assert response.status_code == 200
     remaining_fields = response.json()
-    assert len(remaining_fields) == 3
+    assert len(remaining_fields) == 4
     assert not any(f["id"] == cf2["id"] for f in remaining_fields)
     print("Delete custom field template passed")
 
