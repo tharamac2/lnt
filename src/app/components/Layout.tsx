@@ -22,6 +22,7 @@ import {
   History,
   ScrollText,
   ClipboardList,
+  Building2,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -84,6 +85,12 @@ const navItems: NavItem[] = [
     label: 'Tools Movement History',
     icon: <History className="w-5 h-5" />,
     roles: ['store'],
+  },
+  {
+    path: '/inspector/profile',
+    label: 'Profile',
+    icon: <Building2 className="w-5 h-5" />,
+    roles: ['inspector'],
   },
   {
     path: '/inspector',
@@ -377,7 +384,7 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 min-w-0 p-6 overflow-x-hidden">
           {children}
         </main>
       </div>

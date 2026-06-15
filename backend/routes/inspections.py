@@ -11,6 +11,7 @@ router = APIRouter(prefix="/inspections", tags=["inspections"])
 
 @router.post("/", response_model=InspectionRead)
 def create_inspection(inspection: InspectionCreate, session: Session = Depends(get_session), current_user = Depends(get_current_user)):
+    inspector_employee_id_for_record = None
     if isinstance(current_user, Inspector):
         if current_user.status != "verified":
             raise HTTPException(
@@ -18,6 +19,7 @@ def create_inspection(inspection: InspectionCreate, session: Session = Depends(g
                 detail="Your employee profile must be verified by an admin before you can submit inspections.",
             )
         inspector_id_for_record = current_user.created_by_id
+        inspector_employee_id_for_record = current_user.id
     elif current_user.role == "inspector":
         verified = session.exec(
             select(Inspector).where(
@@ -38,6 +40,7 @@ def create_inspection(inspection: InspectionCreate, session: Session = Depends(g
     # but specifically handle inspector_id which comes from current_user
     inspection_data = inspection.dict(exclude_unset=True)
     inspection_data['inspector_id'] = inspector_id_for_record
+    inspection_data['inspector_employee_id'] = inspector_employee_id_for_record
     
     # Create the model instance with the injection inspector_id
     db_inspection = Inspection(**inspection_data) 

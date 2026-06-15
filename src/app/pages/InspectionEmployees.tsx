@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
-import { UserCircle, Search, X, ShieldCheck, Clock, Undo2 } from 'lucide-react';
+import { UserCircle, Search, X, ShieldCheck, Clock, Undo2, Wrench } from 'lucide-react';
 import api from '../services/api';
 import { toast } from 'sonner';
 import {
@@ -14,6 +14,13 @@ import {
   TableHeader,
   TableRow,
 } from '../components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '../components/ui/dialog';
 
 interface InspectorEntry {
   id: number;
@@ -31,6 +38,9 @@ const InspectionEmployees = () => {
   const [employees, setEmployees] = useState<InspectorEntry[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [selectedEmployee, setSelectedEmployee] = useState<InspectorEntry | null>(null);
+  const [employeeInspections, setEmployeeInspections] = useState<any[]>([]);
+  const [loadingInspections, setLoadingInspections] = useState(false);
 
   const fetchEmployees = async () => {
     try {
@@ -80,6 +90,32 @@ const InspectionEmployees = () => {
     } catch (err) {
       console.error('Failed to update employee', err);
       toast.error('Failed to update employee');
+    }
+  };
+
+  const handleViewInspections = async (emp: InspectorEntry) => {
+    setSelectedEmployee(emp);
+    setLoadingInspections(true);
+    try {
+      const res = await api.get(`/inspectors/${emp.id}/inspections`);
+      setEmployeeInspections(res.data);
+    } catch (err) {
+      console.error('Failed to fetch inspections for employee', err);
+      toast.error('Failed to load inspections for this employee');
+    } finally {
+      setLoadingInspections(false);
+    }
+  };
+
+  const getResultBadge = (result: string) => {
+    switch (result) {
+      case 'pass':
+      case 'usable':
+        return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Pass</Badge>;
+      case 'conditional':
+        return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Conditional</Badge>;
+      default:
+        return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Fail</Badge>;
     }
   };
 
@@ -162,7 +198,15 @@ const InspectionEmployees = () => {
                 <TableBody>
                   {filteredEmployees.map((emp) => (
                     <TableRow key={emp.id} className="hover:bg-blue-50/20">
-                      <TableCell className="font-medium text-[#1E3A8A]">{emp.name}</TableCell>
+                      <TableCell>
+                        <button
+                          type="button"
+                          className="font-medium text-[#1E3A8A] hover:underline"
+                          onClick={() => handleViewInspections(emp)}
+                        >
+                          {emp.name}
+                        </button>
+                      </TableCell>
                       <TableCell className="text-sm text-gray-600">{emp.employee_id}</TableCell>
                       <TableCell className="text-sm text-gray-600">{emp.email || '-'}</TableCell>
                       <TableCell className="text-sm text-gray-600">{emp.designation || '-'}</TableCell>
@@ -200,6 +244,60 @@ const InspectionEmployees = () => {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!selectedEmployee} onOpenChange={(open) => !open && setSelectedEmployee(null)}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench className="w-5 h-5 text-[#1E3A8A]" />
+              Tools Inspected by {selectedEmployee?.name}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedEmployee?.employee_id} &middot; {employeeInspections.length} {employeeInspections.length === 1 ? 'inspection' : 'inspections'} recorded
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingInspections ? (
+            <div className="p-8 text-center text-gray-400">Loading inspections...</div>
+          ) : employeeInspections.length === 0 ? (
+            <div className="p-8 text-center text-gray-400 flex flex-col items-center">
+              <Wrench className="w-12 h-12 text-gray-200 mb-2" />
+              <p>This employee has not submitted any inspections yet.</p>
+            </div>
+          ) : (
+            <div className="max-h-[400px] overflow-auto [&>div]:overflow-visible">
+              <Table className="border-separate border-spacing-0">
+                <TableHeader className="sticky top-0 border-b border-gray-100 z-10 shadow-sm [&_th]:bg-white">
+                  <TableRow>
+                    <TableHead>Tool</TableHead>
+                    <TableHead>QR Code</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Result</TableHead>
+                    <TableHead>Usability</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {employeeInspections.map((insp) => (
+                    <TableRow key={insp.id} className="hover:bg-blue-50/20">
+                      <TableCell className="font-medium text-[#1E3A8A]">{insp.tool?.description || '-'}</TableCell>
+                      <TableCell className="text-sm text-gray-600">
+                        <Badge variant="outline" className="text-[10px] text-gray-500">{insp.tool?.qr_code || '-'}</Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600 whitespace-nowrap">
+                        {insp.date ? new Date(insp.date).toLocaleString() : '-'}
+                      </TableCell>
+                      <TableCell>{getResultBadge(insp.result)}</TableCell>
+                      <TableCell className="text-sm text-gray-600">
+                        {insp.usability_percentage != null ? `${insp.usability_percentage}%` : '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

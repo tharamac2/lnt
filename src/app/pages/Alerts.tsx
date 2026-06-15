@@ -49,9 +49,11 @@ const Alerts = () => {
     fetchAlerts();
   }, []);
 
-  const criticalAlerts = alerts.filter(a => a.severity === 'critical' && !a.is_read);
-  const warningAlerts = alerts.filter(a => a.severity === 'warning' && !a.is_read);
-  const infoAlerts = alerts.filter(a => a.severity === 'info' && !a.is_read);
+  const sortedAlerts = [...alerts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const criticalAlerts = sortedAlerts.filter(a => a.severity === 'critical');
+  const warningAlerts = sortedAlerts.filter(a => a.severity === 'warning');
+  const infoAlerts = sortedAlerts.filter(a => a.severity === 'info');
+  const unreadCount = (list: any[]) => list.filter(a => !a.is_read).length;
 
   // Format date/time helper if needed, assuming backend returns ISO date
   const formatDate = (dateString: string) => {
@@ -205,7 +207,7 @@ const Alerts = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Scrapped Tools</p>
-                <p className="text-3xl font-semibold mt-2">{criticalAlerts.length}</p>
+                <p className="text-3xl font-semibold mt-2">{unreadCount(criticalAlerts)}</p>
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
                 <XCircle className="w-6 h-6 text-[#DC2626]" />
@@ -219,7 +221,7 @@ const Alerts = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Warnings</p>
-                <p className="text-3xl font-semibold mt-2">{warningAlerts.length}</p>
+                <p className="text-3xl font-semibold mt-2">{unreadCount(warningAlerts)}</p>
               </div>
               <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
                 <AlertTriangle className="w-6 h-6 text-[#F59E0B]" />
@@ -233,7 +235,7 @@ const Alerts = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Info Alerts</p>
-                <p className="text-3xl font-semibold mt-2">{infoAlerts.length}</p>
+                <p className="text-3xl font-semibold mt-2">{unreadCount(infoAlerts)}</p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                 <CheckCircle className="w-6 h-6 text-[#1E3A8A]" />
@@ -244,8 +246,11 @@ const Alerts = () => {
       </div>
 
       {/* Alerts Tabs */}
-      <Tabs defaultValue="critical" className="space-y-4">
+      <Tabs defaultValue="all" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="all" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white">
+            All ({sortedAlerts.length})
+          </TabsTrigger>
           <TabsTrigger value="critical" className="data-[state=active]:bg-[#DC2626] data-[state=active]:text-white">
             Scrapped ({criticalAlerts.length})
           </TabsTrigger>
@@ -256,6 +261,13 @@ const Alerts = () => {
             Info ({infoAlerts.length})
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="all" className="space-y-4">
+          {sortedAlerts.map((alert) => (
+            <AlertCard key={alert.id} alert={alert} />
+          ))}
+          {sortedAlerts.length === 0 && <p className="text-gray-500 text-sm py-4">No notifications yet.</p>}
+        </TabsContent>
 
         <TabsContent value="critical" className="space-y-4">
           {criticalAlerts.map((alert) => (
