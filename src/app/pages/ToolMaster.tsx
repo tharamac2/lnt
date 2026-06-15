@@ -875,7 +875,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
           <h1 className="text-3xl font-semibold text-[#0F172A]">Tool Master</h1>
           <p className="text-gray-500 mt-1">Manage tool inventory, generate QR codes, and track assets.</p>
         </div>
-        {user?.role === 'admin' && (
+        {(user?.role === 'admin' || user?.role === 'data_entry') && (
           <div className="flex flex-col sm:flex-row gap-2 items-center">
             <Button onClick={() => setIsImportModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700">
               <UploadCloud className="mr-2 h-4 w-4" /> Bulk Import
@@ -1350,7 +1350,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
                 </SelectContent>
               </Select>
             </div>
-            {user?.role === 'admin' && (
+            {(user?.role === 'admin' || user?.role === 'data_entry') && (
               <div className="flex flex-col gap-2">
                 <Button
                   onClick={handleMarkPrinted}
