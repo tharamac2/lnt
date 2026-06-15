@@ -73,32 +73,6 @@ def create_dealer(
 
     return db_dealer
 
-@router.delete("/{dealer_id}")
-def delete_dealer(
-    dealer_id: int,
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized to manage dealers")
-
-    db_dealer = session.get(Dealer, dealer_id)
-    if not db_dealer:
-        raise HTTPException(status_code=404, detail="Dealer not found")
-
-    session.delete(db_dealer)
-    session.commit()
-
-    log_action(
-        session, current_user, "delete", "Dealer", dealer_id,
-        f"Deleted dealer '{db_dealer.name}' ({db_dealer.dealer_code})",
-        site=current_user.site,
-    )
-    session.commit()
-
-    return {"message": "Dealer deleted successfully"}
-
-
 # --- Custom Fields Management Endpoints ---
 
 @router.get("/custom-fields", response_model=List[DealerCustomFieldRead])
@@ -215,6 +189,32 @@ def delete_custom_field(
     )
     session.commit()
     return {"message": "Custom field definition deleted successfully"}
+
+
+@router.delete("/{dealer_id}")
+def delete_dealer(
+    dealer_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized to manage dealers")
+
+    db_dealer = session.get(Dealer, dealer_id)
+    if not db_dealer:
+        raise HTTPException(status_code=404, detail="Dealer not found")
+
+    session.delete(db_dealer)
+    session.commit()
+
+    log_action(
+        session, current_user, "delete", "Dealer", dealer_id,
+        f"Deleted dealer '{db_dealer.name}' ({db_dealer.dealer_code})",
+        site=current_user.site,
+    )
+    session.commit()
+
+    return {"message": "Dealer deleted successfully"}
 
 
 @router.post("/bulk-import")
