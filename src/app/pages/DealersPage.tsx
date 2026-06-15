@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -39,8 +39,39 @@ interface Dealer {
   contact_number: string | null;
   address: string | null;
   gst_number: string | null;
+  products_services: string | null;
+  status: string;
   custom_fields: string | null; // JSON string of custom fields
 }
+
+// Category-specific labels for the "name"/"code" fields
+const CATEGORY_LABELS: Record<string, { name: string; namePlaceholder: string; code: string; codePlaceholder: string }> = {
+  sub_contractor: {
+    name: 'Sub Contractor Name',
+    namePlaceholder: 'e.g. ABC Erectors',
+    code: 'Sub Contractor Code',
+    codePlaceholder: 'e.g. SUBCON101',
+  },
+  supplier: {
+    name: 'Supplier Name',
+    namePlaceholder: 'e.g. ABC Tools Supplies',
+    code: 'Supplier Code',
+    codePlaceholder: 'e.g. SUP101',
+  },
+  scrap_dealer: {
+    name: 'Scrap Vendor Name',
+    namePlaceholder: 'e.g. ABC Scrap Traders',
+    code: 'Scrap Vendor Code',
+    codePlaceholder: 'e.g. SCRAP101',
+  },
+};
+
+// Category-specific Products/Services dropdown options
+const PRODUCTS_SERVICES_OPTIONS: Record<string, string[]> = {
+  sub_contractor: ['Erection Work', 'Civil Work', 'Electrical Work', 'Mechanical Work', 'Painting', 'Scaffolding', 'Welding & Fabrication', 'Other'],
+  supplier: ['Tools & Equipment', 'Spare Parts', 'Safety Equipment (PPE)', 'Consumables', 'Lubricants & Chemicals', 'Construction Materials', 'Other'],
+  scrap_dealer: ['Ferrous Scrap', 'Non-Ferrous Scrap', 'E-Waste', 'Used Tools & Machinery', 'Mixed Scrap', 'Other'],
+};
 
 interface CustomFieldDef {
   id: number;
@@ -64,6 +95,8 @@ const DealersPage = () => {
   const [contactNumber, setContactNumber] = useState('');
   const [address, setAddress] = useState('');
   const [gstNumber, setGstNumber] = useState('');
+  const [productsServices, setProductsServices] = useState('');
+  const [dealerStatus, setDealerStatus] = useState('active');
   const [customValues, setCustomValues] = useState<Record<string, any>>({});
   const [submitting, setSubmitting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -106,6 +139,11 @@ const DealersPage = () => {
     fetchCustomFieldDefs();
   }, []);
 
+  // Reset Products/Services selection when the category changes (options differ per category)
+  useEffect(() => {
+    setProductsServices('');
+  }, [category]);
+
   const handleAddDealer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !companyName.trim() || !dealerCode.trim()) {
@@ -134,6 +172,8 @@ const DealersPage = () => {
         contact_number: contactNumber.trim() || null,
         address: address.trim() || null,
         gst_number: gstNumber.trim() || null,
+        products_services: productsServices || null,
+        status: dealerStatus,
         custom_fields: payloadCustomFields
       });
       toast.success('Dealer registered successfully!');
@@ -146,6 +186,8 @@ const DealersPage = () => {
       setContactNumber('');
       setAddress('');
       setGstNumber('');
+      setProductsServices('');
+      setDealerStatus('active');
       setCustomValues({});
 
       fetchDealers();
@@ -297,11 +339,12 @@ const DealersPage = () => {
             <TableRow>
               <TableHead className="w-[40px]"></TableHead>
               <TableHead className="w-[60px] font-semibold text-gray-600">S.No</TableHead>
+              <TableHead className="font-semibold text-gray-600">Contact Person</TableHead>
               <TableHead className="font-semibold text-gray-600">Name</TableHead>
-              <TableHead className="font-semibold text-gray-600">Company</TableHead>
-              <TableHead className="font-semibold text-gray-600">Dealer Code</TableHead>
+              <TableHead className="font-semibold text-gray-600">Code</TableHead>
               <TableHead className="font-semibold text-gray-600">GST Number</TableHead>
               <TableHead className="font-semibold text-gray-600">Contact</TableHead>
+              <TableHead className="font-semibold text-gray-600">Status</TableHead>
               <TableHead className="w-[80px] text-right font-semibold text-gray-600">Action</TableHead>
             </TableRow>
           </TableHeader>
@@ -317,7 +360,7 @@ const DealersPage = () => {
                 }
               }
               return (
-                <React.Fragment key={dealer.id}>
+                <Fragment key={dealer.id}>
                   <TableRow
                     className="hover:bg-gray-50/50 transition-colors cursor-pointer"
                     onClick={() => setExpandedDealerId(isExpanded ? null : dealer.id)}
@@ -356,6 +399,16 @@ const DealersPage = () => {
                       )}
                       {!dealer.email && !dealer.contact_number && '-'}
                     </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="secondary"
+                        className={dealer.status === 'inactive'
+                          ? 'bg-gray-100 text-gray-500'
+                          : 'bg-green-100 text-green-700'}
+                      >
+                        {dealer.status === 'inactive' ? 'Inactive' : 'Active'}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <Button
                         variant="ghost"
@@ -371,14 +424,23 @@ const DealersPage = () => {
 
                   {isExpanded && (
                     <TableRow className="bg-slate-50/50 hover:bg-slate-50/50">
-                      <TableCell colSpan={8} className="p-4 border-t border-slate-100">
+                      <TableCell colSpan={9} className="p-4 border-t border-slate-100">
                         <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                          {/* Address details */}
-                          <div className="flex items-start gap-2.5 text-xs text-slate-600">
-                            <MapPin className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
-                            <div>
-                              <span className="font-semibold text-slate-700 block mb-0.5">Address</span>
-                              {dealer.address || 'No address provided'}
+                          {/* Address & Products/Services details */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="flex items-start gap-2.5 text-xs text-slate-600">
+                              <MapPin className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-semibold text-slate-700 block mb-0.5">Location</span>
+                                {dealer.address || 'No location provided'}
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2.5 text-xs text-slate-600">
+                              <Truck className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-semibold text-slate-700 block mb-0.5">Products/Services</span>
+                                {dealer.products_services || 'Not specified'}
+                              </div>
                             </div>
                           </div>
 
@@ -433,7 +495,7 @@ const DealersPage = () => {
                       </TableCell>
                     </TableRow>
                   )}
-                </React.Fragment>
+                </Fragment>
               );
             })}
           </TableBody>
@@ -606,8 +668,34 @@ const DealersPage = () => {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="companyName" className="text-sm font-medium text-gray-700">
+                    {CATEGORY_LABELS[category].name} <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="companyName"
+                    placeholder={CATEGORY_LABELS[category].namePlaceholder}
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="dealerCode" className="text-sm font-medium text-gray-700">
+                    {CATEGORY_LABELS[category].code} <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="dealerCode"
+                    placeholder={CATEGORY_LABELS[category].codePlaceholder}
+                    value={dealerCode}
+                    onChange={(e) => setDealerCode(e.target.value.toUpperCase())}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="dealerName" className="text-sm font-medium text-gray-700">
-                    Name <span className="text-red-500">*</span>
+                    Contact Person <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="dealerName"
@@ -619,34 +707,20 @@ const DealersPage = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="companyName" className="text-sm font-medium text-gray-700">
-                    Company Name <span className="text-red-500">*</span>
+                  <Label htmlFor="contactNumber" className="text-sm font-medium text-gray-700">
+                    Mobile No
                   </Label>
                   <Input
-                    id="companyName"
-                    placeholder="e.g. ABC Tech Solutions"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="dealerCode" className="text-sm font-medium text-gray-700">
-                    Dealer Code <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="dealerCode"
-                    placeholder="e.g. SUBCON101"
-                    value={dealerCode}
-                    onChange={(e) => setDealerCode(e.target.value.toUpperCase())}
-                    required
+                    id="contactNumber"
+                    placeholder="e.g. +91 9876543210"
+                    value={contactNumber}
+                    onChange={(e) => setContactNumber(e.target.value)}
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="mailId" className="text-sm font-medium text-gray-700">
-                    Mail ID
+                    Email ID
                   </Label>
                   <Input
                     id="mailId"
@@ -658,20 +732,8 @@ const DealersPage = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="contactNumber" className="text-sm font-medium text-gray-700">
-                    Contact Number
-                  </Label>
-                  <Input
-                    id="contactNumber"
-                    placeholder="e.g. +91 9876543210"
-                    value={contactNumber}
-                    onChange={(e) => setContactNumber(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
                   <Label htmlFor="address" className="text-sm font-medium text-gray-700">
-                    Address
+                    Location
                   </Label>
                   <Input
                     id="address"
@@ -683,7 +745,7 @@ const DealersPage = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="gstNumber" className="text-sm font-medium text-gray-700">
-                    GST Number
+                    GST No
                   </Label>
                   <Input
                     id="gstNumber"
@@ -691,6 +753,38 @@ const DealersPage = () => {
                     value={gstNumber}
                     onChange={(e) => setGstNumber(e.target.value.toUpperCase())}
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="productsServices" className="text-sm font-medium text-gray-700">
+                    Products/Services
+                  </Label>
+                  <select
+                    id="productsServices"
+                    value={productsServices}
+                    onChange={(e) => setProductsServices(e.target.value)}
+                    className="w-full h-10 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">Select Products/Services</option>
+                    {PRODUCTS_SERVICES_OPTIONS[category].map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="dealerStatus" className="text-sm font-medium text-gray-700">
+                    Status
+                  </Label>
+                  <select
+                    id="dealerStatus"
+                    value={dealerStatus}
+                    onChange={(e) => setDealerStatus(e.target.value)}
+                    className="w-full h-10 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
                 </div>
 
                 {/* Render Custom Fields dynamically in Dealer Form */}

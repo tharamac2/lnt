@@ -49,6 +49,7 @@ def create_dealer(
 
     payload.dealer_code = payload.dealer_code.strip().upper()
     payload.category = payload.category.strip().lower()
+    payload.status = (payload.status or "active").strip().lower()
 
     if not normalize_category(payload.category):
         raise HTTPException(status_code=400, detail="Invalid dealer category. Choose Sub Contractor, Supplier, or Scrap Dealer.")

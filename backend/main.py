@@ -40,6 +40,26 @@ def on_startup():
             except Exception as e:
                 print(f"Migration error adding 'custom_fields' column: {e}")
 
+        try:
+            conn.execute(text("SELECT products_services FROM dealer LIMIT 1"))
+        except Exception:
+            try:
+                conn.execute(text("ALTER TABLE dealer ADD COLUMN products_services TEXT"))
+                conn.commit()
+                print("Migration: Successfully added 'products_services' column to 'dealer' table.")
+            except Exception as e:
+                print(f"Migration error adding 'products_services' column: {e}")
+
+        try:
+            conn.execute(text("SELECT status FROM dealer LIMIT 1"))
+        except Exception:
+            try:
+                conn.execute(text("ALTER TABLE dealer ADD COLUMN status VARCHAR DEFAULT 'active'"))
+                conn.commit()
+                print("Migration: Successfully added 'status' column to 'dealer' table.")
+            except Exception as e:
+                print(f"Migration error adding 'status' column: {e}")
+
 # Mount uploads directory to serve files
 app.mount("/api/uploads", StaticFiles(directory="uploads"), name="uploads")
 

@@ -255,13 +255,15 @@ class InspectorUpdate(SQLModel):
 
 class DealerBase(SQLModel):
     category: str = Field(index=True) # sub_contractor, supplier, scrap_dealer
-    name: str = Field(index=True)
+    name: str = Field(index=True) # Contact Person
     company_name: str
     dealer_code: str = Field(index=True, unique=True)
     email: Optional[str] = None
     contact_number: Optional[str] = None
     address: Optional[str] = None
     gst_number: Optional[str] = None
+    products_services: Optional[str] = None
+    status: str = Field(default="active") # active, inactive
     custom_fields: Optional[str] = None # JSON string for custom field values: {"field_name": "value"}
 
 class Dealer(DealerBase, table=True):
@@ -282,6 +284,8 @@ class DealerUpdate(SQLModel):
     contact_number: Optional[str] = None
     address: Optional[str] = None
     gst_number: Optional[str] = None
+    products_services: Optional[str] = None
+    status: Optional[str] = None
     custom_fields: Optional[str] = None
 
 
