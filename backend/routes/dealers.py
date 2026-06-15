@@ -97,8 +97,8 @@ def create_custom_field(
     if not payload.name:
         raise HTTPException(status_code=400, detail="Field name cannot be empty")
         
-    if payload.field_type not in ("text", "number", "file"):
-        raise HTTPException(status_code=400, detail="Invalid field type. Choose text, number, or file.")
+    if payload.field_type not in ("text", "number", "file", "radio", "checkbox"):
+        raise HTTPException(status_code=400, detail="Invalid field type. Choose text, number, file, radio, or checkbox.")
 
     # Check unique name (case-insensitive)
     stmt = select(DealerCustomField)
@@ -148,12 +148,15 @@ def update_custom_field(
 
     if "field_type" in update_data:
         field_type = update_data["field_type"]
-        if field_type not in ("text", "number", "file"):
-            raise HTTPException(status_code=400, detail="Invalid field type. Choose text, number, or file.")
+        if field_type not in ("text", "number", "file", "radio", "checkbox"):
+            raise HTTPException(status_code=400, detail="Invalid field type. Choose text, number, file, radio, or checkbox.")
         db_field.field_type = field_type
 
     if "is_required" in update_data:
         db_field.is_required = update_data["is_required"]
+
+    if "options" in update_data:
+        db_field.options = update_data["options"]
 
     session.add(db_field)
     session.commit()
