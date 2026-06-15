@@ -292,9 +292,10 @@ const ToolMaster = ({ user }: { user?: User }) => {
     doc.text(`Generated: ${new Date().toLocaleString()}`, 50, 21);
 
     autoTable(doc, {
-      head: [['Tool Name', 'QR Code', 'Make', 'Capacity', 'Current Site', 'Status', 'View Tool']],
+      head: [['Tool Name', 'Item Code', 'QR Code', 'Make', 'Capacity', 'Current Site', 'Status', 'View Tool']],
       body: exportTools.map((tool) => [
         tool.description,
+        tool.item_code || '-',
         tool.qr_code,
         tool.make,
         tool.capacity,
@@ -306,7 +307,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
       theme: 'grid',
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [30, 58, 138] },
-      columnStyles: { 6: { textColor: [30, 58, 138] } },
+      columnStyles: { 7: { textColor: [30, 58, 138] } },
     });
 
     doc.save(`Tool_Master_Inventory_${Date.now()}.pdf`);
@@ -320,7 +321,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Inventory');
 
-      const headers = ['Tool Name', 'QR Code', 'Make', 'Capacity', 'Current Site', 'Status', 'View Tool'];
+      const headers = ['Tool Name', 'Item Code', 'QR Code', 'Make', 'Capacity', 'Current Site', 'Status', 'View Tool'];
 
       // Row 1: title
       const headerRow = worksheet.addRow(['Tool Master - Existing Inventory']);
@@ -349,6 +350,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
         const viewToolUrl = `${baseUrl}/view-tool/${tool.qr_code}`;
         const row = worksheet.addRow([
           tool.description,
+          tool.item_code || '-',
           tool.qr_code,
           tool.make,
           tool.capacity,
@@ -356,7 +358,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
           tool.status,
           viewToolUrl,
         ]);
-        const linkCell = row.getCell(7);
+        const linkCell = row.getCell(8);
         linkCell.value = { text: viewToolUrl, hyperlink: viewToolUrl };
         linkCell.font = { color: { argb: 'FF1E3A8A' }, underline: true };
       });
@@ -998,7 +1000,9 @@ const ToolMaster = ({ user }: { user?: User }) => {
                       </SelectTrigger>
                       <SelectContent className="max-h-[300px]">
                         {dynamicToolsList.map((tool) => (
-                          <SelectItem key={tool} value={tool}>{tool}</SelectItem>
+                          <SelectItem key={tool} value={tool}>
+                            {tool} {dynamicToolCodeMapping[tool] ? `(${dynamicToolCodeMapping[tool]})` : ''}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1415,6 +1419,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
                     />
                   </TableHead>
                   <TableHead>Tool Name</TableHead>
+                  <TableHead>Item Code</TableHead>
                   <TableHead>QR Code</TableHead>
                   <TableHead>Make</TableHead>
                   <TableHead>Capacity</TableHead>
@@ -1444,6 +1449,9 @@ const ToolMaster = ({ user }: { user?: User }) => {
                         >
                           {tool.description}
                         </span>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-blue-600 font-medium">
+                        {tool.item_code || '-'}
                       </TableCell>
                       <TableCell className="font-mono text-xs">{tool.qr_code}</TableCell>
                       <TableCell>{tool.make}</TableCell>
