@@ -8,6 +8,61 @@ from ..audit import log_action
 
 router = APIRouter(prefix="/tools", tags=["tools"])
 
+def resequence_unprinted_tools(session: Session, deleted_qr_code: str):
+    """
+    Resequence all active unprinted tools in the database that have a serial number
+    greater than the deleted QR code's suffix, skipping any printed serial numbers.
+    """
+    if not deleted_qr_code or len(deleted_qr_code) < 4:
+        return
+        
+    try:
+        deleted_suffix = deleted_qr_code[-4:]
+        if not deleted_suffix.isdigit():
+            return
+        deleted_serial = int(deleted_suffix)
+        
+        # 1. Fetch all printed serial numbers in the database
+        printed_tools = session.exec(select(Tool).where(Tool.is_printed == True)).all()
+        printed_serials = set()
+        for pt in printed_tools:
+            if pt.qr_code and len(pt.qr_code) >= 4:
+                pt_suffix = pt.qr_code[-4:]
+                if pt_suffix.isdigit():
+                    printed_serials.add(int(pt_suffix))
+                    
+        # 2. Fetch all active unprinted tools to resequence
+        unprinted_tools = session.exec(select(Tool).where(Tool.is_printed == False, Tool.is_deleted == False)).all()
+        to_resequence = []
+        for ut in unprinted_tools:
+            if ut.qr_code and len(ut.qr_code) >= 4:
+                ut_suffix = ut.qr_code[-4:]
+                if ut_suffix.isdigit():
+                    ut_serial = int(ut_suffix)
+                    if ut_serial > deleted_serial:
+                        ut_prefix = ut.qr_code[:-4]
+                        to_resequence.append((ut_serial, ut_prefix, ut))
+                        
+        # 3. Sort ascending by current serial
+        to_resequence.sort(key=lambda x: x[0])
+        
+        # 4. Assign new serials skipping printed ones
+        current_serial = deleted_serial
+        for ut_serial, ut_prefix, ut in to_resequence:
+            while current_serial in printed_serials:
+                current_serial += 1
+            
+            # Update the tool QR code if changed
+            if current_serial != ut_serial:
+                ut.qr_code = f"{ut_prefix}{current_serial:04d}"
+                session.add(ut)
+                
+            current_serial += 1
+            
+        session.flush()
+    except Exception as e:
+        print(f"Error in resequence_unprinted_tools: {e}")
+
 @router.post("/", response_model=ToolRead)
 def create_tool(tool: ToolCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
     db_tool = Tool.from_orm(tool)
@@ -254,59 +309,8 @@ def delete_tool(tool_id: int, session: Session = Depends(get_session), current_u
 
         session.delete(tool)
         
-        # Resequence unprinted tools in the same batch (uploaded together)
-        if deleted_qr_code and len(deleted_qr_code) >= 4 and deleted_created_at:
-            try:
-                deleted_serial = int(deleted_qr_code[-4:])
-                
-                # Fetch all tools created in the same batch (within 5 seconds of creation time)
-                # (both active and soft-deleted tools, to avoid reusing printed serial numbers)
-                batch_tools = []
-                # First fetch candidate tools from DB (we filter in python to handle time calculations cleanly)
-                candidates = session.exec(
-                    select(Tool)
-                ).all()
-                for c in candidates:
-                    if c.created_at and abs((c.created_at - deleted_created_at).total_seconds()) <= 5:
-                        batch_tools.append(c)
-                
-                # Identify printed serial numbers in the same batch
-                printed_serials = set()
-                for bt in batch_tools:
-                    if bt.is_printed and bt.qr_code and len(bt.qr_code) >= 4:
-                        bt_suffix = bt.qr_code[-4:]
-                        if bt_suffix.isdigit():
-                            printed_serials.add(int(bt_suffix))
-                
-                # Filter unprinted tools in the same batch that need to be resequenced
-                to_resequence = []
-                for bt in batch_tools:
-                    if not bt.is_printed and bt.qr_code and len(bt.qr_code) >= 4:
-                        bt_suffix = bt.qr_code[-4:]
-                        if bt_suffix.isdigit():
-                            bt_serial = int(bt_suffix)
-                            if bt_serial > deleted_serial:
-                                bt_prefix = bt.qr_code[:-4]
-                                to_resequence.append((bt_serial, bt_prefix, bt))
-                
-                # Sort ascending by current serial
-                to_resequence.sort(key=lambda x: x[0])
-                
-                # Assign new serials skipping printed ones
-                current_serial = deleted_serial
-                for ut_serial, ut_prefix, ut in to_resequence:
-                    while current_serial in printed_serials:
-                        current_serial += 1
-                    
-                    # If the new serial is different, update the tool
-                    if current_serial != ut_serial:
-                        ut.qr_code = f"{ut_prefix}{current_serial:04d}"
-                        session.add(ut)
-                    
-                    # Increment current_serial for the next unprinted tool
-                    current_serial += 1
-            except ValueError:
-                pass # QR code wasn't following the exact integer suffix format
+        # Resequence unprinted tools database-wide to prevent gaps
+        resequence_unprinted_tools(session, deleted_qr_code)
 
     session.flush()
 

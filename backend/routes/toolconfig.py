@@ -8,6 +8,7 @@ from ..models import ToolConfig, ToolConfigCreate, ToolConfigRead, User, Tool, A
 from ..auth import get_current_user
 from ..audit import log_action
 from pydantic import BaseModel
+from .tools import resequence_unprinted_tools
 
 router = APIRouter(prefix="/toolconfig", tags=["toolconfig"])
 
@@ -209,12 +210,14 @@ def delete_tool_config(
                 session.delete(mov)
 
             # Delete tool
+            qr_to_resequence = t.qr_code
             session.delete(t)
             log_action(
                 session, current_user, "delete", "Tool", t.id,
                 f"Hard-deleted unprinted tool {t.description} ({t.qr_code}) due to config deletion cascade",
                 site=t.current_site,
             )
+            resequence_unprinted_tools(session, qr_to_resequence)
 
     # 2. Delete the configuration entry
     session.delete(db_config)
