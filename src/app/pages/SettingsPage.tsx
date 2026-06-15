@@ -29,6 +29,7 @@ const SettingsPage = () => {
     expiry: true,
     inspection: true,
   });
+  const [isBackingUp, setIsBackingUp] = useState(false);
 
   // --- Validation helpers ---
   const isValidEmail = (email: string) =>
@@ -315,9 +316,28 @@ const SettingsPage = () => {
               <Separator />
               <div className="space-y-4">
                 <h3 className="font-medium">Manual Backup</h3>
-                <Button className="bg-[#1E3A8A]">
+                <p className="text-sm text-gray-500">
+                  Generate a full data backup and send it to your registered email address.
+                </p>
+                <Button
+                  className="bg-[#1E3A8A]"
+                  disabled={isBackingUp}
+                  onClick={async () => {
+                    setIsBackingUp(true);
+                    const toastId = toast.loading('Generating backup and sending email...');
+                    try {
+                      const response = await api.post('/export/email-backup');
+                      toast.success(`Backup emailed to ${response.data.sent_to}`, { id: toastId });
+                    } catch (error) {
+                      console.error(error);
+                      toast.error('Failed to create and email backup', { id: toastId });
+                    } finally {
+                      setIsBackingUp(false);
+                    }
+                  }}
+                >
                   <Database className="w-4 h-4 mr-2" />
-                  Create Backup Now
+                  {isBackingUp ? 'Sending Backup...' : 'Create Backup Now'}
                 </Button>
               </div>
             </CardContent>

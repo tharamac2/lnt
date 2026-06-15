@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Separator } from '../components/ui/separator';
 import { QRCodeCanvas } from 'qrcode.react';
-import { Download, Printer, Save, Edit, Search, FileDown, History, UploadCloud, X, Activity, Trash2, FileSpreadsheet } from 'lucide-react';
+import { Download, Printer, Save, Edit, Search, FileDown, History, UploadCloud, X, Activity, Trash2, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import {
@@ -205,6 +205,17 @@ const ToolMaster = ({ user }: { user?: User }) => {
 
   const [errors, setErrors] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Success Popup State
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [successPopupMessage, setSuccessPopupMessage] = useState('Tool has been created successfully.');
+
+  useEffect(() => {
+    if (showSuccessPopup) {
+      const timer = setTimeout(() => setShowSuccessPopup(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessPopup]);
 
   const [hoveredTool, setHoveredTool] = useState<any | null>(null);
 
@@ -561,6 +572,8 @@ const ToolMaster = ({ user }: { user?: User }) => {
         await api.post('/tools/', payload);
         toast.success('Tool saved to database successfully');
         setIsToolSaved(true);
+        setSuccessPopupMessage('Tool has been created successfully.');
+        setShowSuccessPopup(true);
         // If save is successful, set active tab to saved? No, stay to show QR code
         // Keep active tab as 'new' to show the QR code
       }
@@ -848,6 +861,8 @@ const ToolMaster = ({ user }: { user?: User }) => {
       setImportFile(null);
       fetchTools(); // Refresh inventory
       setActiveTab('saved'); // Switch to inventory to see new items
+      setSuccessPopupMessage('Tools have been created successfully.');
+      setShowSuccessPopup(true);
     } catch (error: any) {
       console.error("Bulk upload error", error);
       let errMsg = error.message || "Bulk import failed.";
@@ -909,6 +924,26 @@ const ToolMaster = ({ user }: { user?: User }) => {
           </div>
         )}
       </div>
+
+      {/* Tool Created Success Popup */}
+      <Dialog open={showSuccessPopup} onOpenChange={setShowSuccessPopup}>
+        <DialogContent className="sm:max-w-sm text-center">
+          <div className="flex flex-col items-center gap-4 py-4">
+            <img src={ltLogo} alt="L&T Logo" className="h-12 w-auto animate-in fade-in zoom-in duration-500" />
+            <div className="relative flex items-center justify-center">
+              <span className="absolute inline-flex h-16 w-16 rounded-full bg-green-400 opacity-75 animate-ping"></span>
+              <CheckCircle2 className="relative h-16 w-16 text-green-500 animate-in zoom-in duration-500" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Success!</h2>
+              <p className="text-sm text-gray-500 mt-1">{successPopupMessage}</p>
+            </div>
+            <Button onClick={() => setShowSuccessPopup(false)} className="bg-[#1E3A8A] hover:bg-[#1E3A8A]/90 mt-2">
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Bulk Import Modal */}
       <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
@@ -1346,6 +1381,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="usable">Usable</SelectItem>
+                  <SelectItem value="under-repair">Under Repair</SelectItem>
                   <SelectItem value="scrap">Scrap</SelectItem>
                 </SelectContent>
               </Select>
@@ -1458,7 +1494,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
                       <TableCell>{tool.capacity}</TableCell>
                       <TableCell>{tool.current_site || '-'}</TableCell>
                       <TableCell>
-                        <span className={`px-2 py-1 rounded text-xs font-semibold capitalize ${tool.status === 'usable' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        <span className={`px-2 py-1 rounded text-xs font-semibold capitalize ${tool.status === 'usable' ? 'bg-green-100 text-green-700' : tool.status === 'under-repair' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
                           }`}>
                           {tool.status}
                         </span>

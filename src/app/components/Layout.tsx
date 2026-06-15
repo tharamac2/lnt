@@ -163,7 +163,7 @@ const navItems: NavItem[] = [
     path: '/inspection-employees',
     label: 'Inspection Employees',
     icon: <UserCircle className="w-5 h-5" />,
-    roles: ['admin'],
+    roles: ['admin', 'store'],
   },
   {
     path: '/settings',

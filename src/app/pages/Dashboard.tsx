@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { FileDown, FileText, RefreshCw, Activity, ShieldCheck, AlertTriangle, Hammer, Calendar, CheckCircle } from 'lucide-react';
+import { FileDown, FileText, RefreshCw, Activity, ShieldCheck, AlertTriangle, Hammer, Calendar, CheckCircle, Wrench } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
@@ -34,6 +34,7 @@ const Dashboard = ({ user }: { user?: User }) => {
         total: 0,
         usable: 0,
         scrap: 0,
+        underRepair: 0,
         expiringSoon: 0,
         overdue: 0,
         deletedPrinted: 0
@@ -95,6 +96,7 @@ const Dashboard = ({ user }: { user?: User }) => {
             const total = tools.length;
             const usable = tools.filter((t: any) => t.status === 'usable').length;
             const scrap = tools.filter((t: any) => t.status === 'scrap').length;
+            const underRepair = tools.filter((t: any) => t.status === 'under-repair').length;
 
             const today = new Date();
             const thirtyDaysFromNow = new Date();
@@ -117,6 +119,7 @@ const Dashboard = ({ user }: { user?: User }) => {
                 total,
                 usable,
                 scrap,
+                underRepair,
                 expiringSoon,
                 overdue,
                 deletedPrinted: deletedTools.length
@@ -136,8 +139,9 @@ const Dashboard = ({ user }: { user?: User }) => {
                 value: statusCounts[s],
                 color: s === 'Usable' ? '#10B981' :
                     s === 'Scrap' ? '#EF4444' :
-                        s === 'Missing' ? '#F59E0B' :
-                            s === 'Stolen' ? '#6366F1' : '#94A3B8'
+                        s === 'Under-repair' ? '#F59E0B' :
+                            s === 'Missing' ? '#F59E0B' :
+                                s === 'Stolen' ? '#6366F1' : '#94A3B8'
             }));
             setStatusData(statusChartData);
 
@@ -355,6 +359,7 @@ const Dashboard = ({ user }: { user?: User }) => {
         const total = filtered.length;
         const usable = filtered.filter((t: any) => t.status === 'usable').length;
         const scrap = filtered.filter((t: any) => t.status === 'scrap').length;
+        const underRepair = filtered.filter((t: any) => t.status === 'under-repair').length;
         
         const today = new Date();
         const thirtyDaysFromNow = new Date();
@@ -379,7 +384,7 @@ const Dashboard = ({ user }: { user?: User }) => {
             deletedFiltered = deletedFiltered.filter(t => t.current_site === siteFilter);
         }
 
-        setStats({ total, usable, scrap, expiringSoon, overdue, deletedPrinted: deletedFiltered.length });
+        setStats({ total, usable, scrap, underRepair, expiringSoon, overdue, deletedPrinted: deletedFiltered.length });
         
         // Update Chart Data (status distribution only for simplicity)
         const statusCounts: Record<string, number> = {};
@@ -391,7 +396,7 @@ const Dashboard = ({ user }: { user?: User }) => {
         const statusChartData = Object.keys(statusCounts).map(s => ({
             name: s,
             value: statusCounts[s],
-            color: s === 'Usable' ? '#10B981' : s === 'Scrap' ? '#EF4444' : '#94A3B8'
+            color: s === 'Usable' ? '#10B981' : s === 'Scrap' ? '#EF4444' : s === 'Under-repair' ? '#F59E0B' : '#94A3B8'
         }));
         setStatusData(statusChartData);
 
@@ -498,7 +503,7 @@ const Dashboard = ({ user }: { user?: User }) => {
         const statsData = [
             ['Total Tools', stats.total, 'Expiring Soon', stats.expiringSoon],
             ['Usable', stats.usable, 'Overdue', stats.overdue],
-            ['Scrap', stats.scrap, '', '']
+            ['Scrap', stats.scrap, 'Under Repair', stats.underRepair]
         ];
 
         autoTable(doc, {
@@ -675,7 +680,7 @@ const Dashboard = ({ user }: { user?: User }) => {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                 <Card className="shadow-sm border-l-4 border-l-blue-500">
                     <CardContent className="p-6 flex items-center justify-between">
                         <div>
@@ -706,6 +711,17 @@ const Dashboard = ({ user }: { user?: User }) => {
                         </div>
                         <div className="p-3 bg-red-50 rounded-full">
                             <AlertTriangle className="w-6 h-6 text-red-500" />
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card className="shadow-sm border-l-4 border-l-amber-500">
+                    <CardContent className="p-6 flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-gray-500">Under Repair</p>
+                            <h3 className="text-2xl font-bold text-gray-900">{stats.underRepair}</h3>
+                        </div>
+                        <div className="p-3 bg-amber-50 rounded-full">
+                            <Wrench className="w-6 h-6 text-amber-500" />
                         </div>
                     </CardContent>
                 </Card>

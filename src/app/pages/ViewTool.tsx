@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { ArrowLeft, CheckCircle, AlertTriangle, XCircle, Calendar, MapPin, Activity, FileDown, QrCode } from 'lucide-react';
+import { ArrowLeft, CheckCircle, AlertTriangle, XCircle, Calendar, MapPin, Activity, FileDown, QrCode, Wrench } from 'lucide-react';
 import api from '../services/api';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
@@ -143,9 +143,11 @@ const ViewTool = () => {
                     <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
                         <span className="text-sm text-gray-500">Status</span>
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1
-               ${tool.status === 'usable' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+               ${tool.status === 'usable' ? 'bg-green-100 text-green-700' : tool.status === 'under-repair' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
                             {tool.status === 'usable' ? (
                                 <CheckCircle className="w-3 h-3" />
+                            ) : tool.status === 'under-repair' ? (
+                                <Wrench className="w-3 h-3" />
                             ) : (
                                 <XCircle className="w-3 h-3" />
                             )}{tool.status.toUpperCase()}

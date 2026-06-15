@@ -60,7 +60,10 @@ def create_inspection(inspection: InspectionCreate, session: Session = Depends(g
         # Based on tool master, it uses 'usable'/'not-usable'.
         
         if db_inspection.result in ["fail", "not-usable", "scrap"]:
-            tool.status = "scrap" 
+            tool.status = "scrap"
+            tool.inspection_result = "not-usable"
+        elif db_inspection.result in ["repair", "under-repair"]:
+            tool.status = "under-repair"
             tool.inspection_result = "not-usable"
         else:
             tool.status = "usable"

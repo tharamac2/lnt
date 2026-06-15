@@ -8,7 +8,7 @@ import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
-import { QrCode, Upload, CheckCircle, XCircle, UserPlus, ShieldCheck, Clock, Search, X, Package } from 'lucide-react';
+import { QrCode, Upload, CheckCircle, XCircle, UserPlus, ShieldCheck, Clock, Search, X, Package, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 import { DatePicker } from '../components/ui/date-picker';
 import api from '../services/api';
@@ -254,6 +254,7 @@ const InspectorView = () => {
     switch (status) {
       case 'usable': return 'bg-[#16A34A] text-white';
       case 'scrap': return 'bg-red-100 text-red-700';
+      case 'under-repair': return 'bg-amber-100 text-amber-700';
       case 'missing': return 'bg-orange-100 text-orange-700';
       case 'stolen': return 'bg-red-900 text-white';
       case 'scrapped': return 'bg-neutral-800 text-white';
@@ -544,7 +545,7 @@ const InspectorView = () => {
                     setInspectionData(prev => ({
                       ...prev,
                       result: value,
-                      remarks: value === 'fail' ? 'Scrapped' : ''
+                      remarks: value === 'fail' ? 'Scrapped' : value === 'repair' ? 'Sent for repair' : ''
                     }));
                   }}
                 >
@@ -554,6 +555,13 @@ const InspectorView = () => {
                       <Label htmlFor="pass" className="font-normal cursor-pointer flex items-center gap-2">
                         <CheckCircle className="w-4 h-4 text-[#16A34A]" />
                         Pass
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="repair" id="repair" />
+                      <Label htmlFor="repair" className="font-normal cursor-pointer flex items-center gap-2">
+                        <Wrench className="w-4 h-4 text-amber-600" />
+                        Repair
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
