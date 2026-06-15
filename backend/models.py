@@ -291,9 +291,9 @@ class DealerUpdate(SQLModel):
 
 class DealerCustomFieldBase(SQLModel):
     name: str = Field(index=True, unique=True)
-    field_type: str  # text, number, file, radio, checkbox
+    field_type: str  # text, number, file, radio, checkbox, checkboxes
     is_required: bool = Field(default=False)
-    options: Optional[str] = None  # Comma-separated options for radio field type
+    options: Optional[str] = None  # Comma-separated options for radio or checkboxes field type
 
 class DealerCustomField(DealerCustomFieldBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

@@ -76,7 +76,7 @@ const PRODUCTS_SERVICES_OPTIONS: Record<string, string[]> = {
 interface CustomFieldDef {
   id: number;
   name: string;
-  field_type: 'text' | 'number' | 'file' | 'radio' | 'checkbox';
+  field_type: 'text' | 'number' | 'file' | 'radio' | 'checkbox' | 'checkboxes';
   is_required: boolean;
   options: string | null;
 }
@@ -105,7 +105,7 @@ const DealersPage = () => {
   // Custom Field Form state (for creating a custom field)
   const [showFieldBuilder, setShowFieldBuilder] = useState(false);
   const [newFieldName, setNewFieldName] = useState('');
-  const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'file' | 'radio' | 'checkbox'>('text');
+  const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'file' | 'radio' | 'checkbox' | 'checkboxes'>('text');
   const [newFieldRequired, setNewFieldRequired] = useState(false);
   const [newFieldOptions, setNewFieldOptions] = useState('');
   const [savingField, setSavingField] = useState(false);
@@ -252,8 +252,9 @@ const DealersPage = () => {
       toast.error('Field name is required');
       return;
     }
-    if (newFieldType === 'radio' && !newFieldOptions.trim()) {
-      toast.error('Options are required for radio buttons');
+    const isMultiOption = newFieldType === 'radio' || newFieldType === 'checkboxes';
+    if (isMultiOption && !newFieldOptions.trim()) {
+      toast.error(`Options are required for ${newFieldType} fields`);
       return;
     }
     setSavingField(true);
@@ -262,7 +263,7 @@ const DealersPage = () => {
         name: newFieldName.trim(),
         field_type: newFieldType,
         is_required: newFieldRequired,
-        options: newFieldType === 'radio' ? newFieldOptions.trim() : null
+        options: isMultiOption ? newFieldOptions.trim() : null
       });
       toast.success('Custom field template added successfully');
       setNewFieldName('');
@@ -478,6 +479,14 @@ const DealersPage = () => {
                                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${val ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'}`}>
                                             {val ? 'Yes' : 'No'}
                                           </span>
+                                        ) : Array.isArray(val) ? (
+                                          <div className="flex flex-wrap gap-1 mt-1">
+                                            {val.map((item) => (
+                                              <span key={item} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-55 text-indigo-750 border border-indigo-100/60">
+                                                {item}
+                                              </span>
+                                            ))}
+                                          </div>
                                         ) : (
                                           <span className="text-xs font-semibold text-slate-700 block truncate max-w-[170px]" title={String(val)}>
                                             {String(val)}
@@ -611,6 +620,7 @@ const DealersPage = () => {
                             <option value="file">File / Image Upload</option>
                             <option value="radio">Radio Buttons (Single Select)</option>
                             <option value="checkbox">Checkbox (Toggle)</option>
+                            <option value="checkboxes">Checkboxes (Multiple Select)</option>
                           </select>
                         </div>
                         <div className="flex items-center space-x-2 pt-6">
@@ -627,7 +637,7 @@ const DealersPage = () => {
                         </div>
                       </div>
                       
-                      {newFieldType === 'radio' && (
+                      {(newFieldType === 'radio' || newFieldType === 'checkboxes') && (
                         <div className="space-y-1">
                           <Label htmlFor="customFieldOptions" className="text-xs font-semibold text-slate-600">
                             Options (comma-separated) <span className="text-red-500">*</span>
@@ -933,6 +943,34 @@ const DealersPage = () => {
                                   <span>{opt}</span>
                                 </label>
                               ))}
+                            </div>
+                          )}
+
+                          {fdef.field_type === 'checkboxes' && (
+                            <div className="flex flex-wrap gap-4 pt-1">
+                              {(fdef.options || '').split(',').map((o) => o.trim()).filter(Boolean).map((opt) => {
+                                const currentArray = Array.isArray(val) ? val : [];
+                                const isChecked = currentArray.includes(opt);
+                                return (
+                                  <label key={opt} className="flex items-center space-x-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => {
+                                        let nextArray;
+                                        if (isChecked) {
+                                          nextArray = currentArray.filter((item: string) => item !== opt);
+                                        } else {
+                                          nextArray = [...currentArray, opt];
+                                        }
+                                        setCustomValues(prev => ({ ...prev, [fdef.name]: nextArray }));
+                                      }}
+                                      className="rounded border-slate-350 text-indigo-600 focus:ring-indigo-500 h-4.5 w-4.5 cursor-pointer"
+                                    />
+                                    <span>{opt}</span>
+                                  </label>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
