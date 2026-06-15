@@ -22,6 +22,7 @@ import {
   History,
   ScrollText,
   ClipboardList,
+  Sliders,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -60,6 +61,12 @@ const navItems: NavItem[] = [
     label: 'Tool Master',
     icon: <Package className="w-5 h-5" />,
     roles: ['admin', 'data_entry'],
+  },
+  {
+    path: '/tool-config',
+    label: 'Tool Config',
+    icon: <Sliders className="w-5 h-5" />,
+    roles: ['admin'],
   },
   {
     path: '/store-view',
