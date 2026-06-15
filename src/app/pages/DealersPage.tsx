@@ -45,8 +45,9 @@ interface Dealer {
 interface CustomFieldDef {
   id: number;
   name: string;
-  field_type: 'text' | 'number' | 'file';
+  field_type: 'text' | 'number' | 'file' | 'radio' | 'checkbox';
   is_required: boolean;
+  options: string | null;
 }
 
 const DealersPage = () => {
@@ -71,8 +72,9 @@ const DealersPage = () => {
   // Custom Field Form state (for creating a custom field)
   const [showFieldBuilder, setShowFieldBuilder] = useState(false);
   const [newFieldName, setNewFieldName] = useState('');
-  const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'file'>('text');
+  const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'file' | 'radio' | 'checkbox'>('text');
   const [newFieldRequired, setNewFieldRequired] = useState(false);
+  const [newFieldOptions, setNewFieldOptions] = useState('');
   const [savingField, setSavingField] = useState(false);
 
   // UI States
@@ -208,16 +210,22 @@ const DealersPage = () => {
       toast.error('Field name is required');
       return;
     }
+    if (newFieldType === 'radio' && !newFieldOptions.trim()) {
+      toast.error('Options are required for radio buttons');
+      return;
+    }
     setSavingField(true);
     try {
       await api.post('/dealers/custom-fields', {
         name: newFieldName.trim(),
         field_type: newFieldType,
-        is_required: newFieldRequired
+        is_required: newFieldRequired,
+        options: newFieldType === 'radio' ? newFieldOptions.trim() : null
       });
       toast.success('Custom field template added successfully');
       setNewFieldName('');
       setNewFieldRequired(false);
+      setNewFieldOptions('');
       setShowFieldBuilder(false);
       fetchCustomFieldDefs();
     } catch (error: any) {
@@ -404,6 +412,10 @@ const DealersPage = () => {
                                           <span className="text-xs text-indigo-600 font-medium truncate block max-w-[170px]" title={val.split('/').pop()}>
                                             {val.split('/').pop()}
                                           </span>
+                                        ) : typeof val === 'boolean' ? (
+                                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${val ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'}`}>
+                                            {val ? 'Yes' : 'No'}
+                                          </span>
                                         ) : (
                                           <span className="text-xs font-semibold text-slate-700 block truncate max-w-[170px]" title={String(val)}>
                                             {String(val)}
@@ -535,6 +547,8 @@ const DealersPage = () => {
                             <option value="text">Alphabet / Text</option>
                             <option value="number">Numeric</option>
                             <option value="file">File / Image Upload</option>
+                            <option value="radio">Radio Buttons (Single Select)</option>
+                            <option value="checkbox">Checkbox (Toggle)</option>
                           </select>
                         </div>
                         <div className="flex items-center space-x-2 pt-6">
@@ -550,6 +564,22 @@ const DealersPage = () => {
                           </Label>
                         </div>
                       </div>
+                      
+                      {newFieldType === 'radio' && (
+                        <div className="space-y-1">
+                          <Label htmlFor="customFieldOptions" className="text-xs font-semibold text-slate-600">
+                            Options (comma-separated) <span className="text-red-500">*</span>
+                          </Label>
+                          <Input
+                            id="customFieldOptions"
+                            placeholder="e.g. Option A, Option B, Option C"
+                            value={newFieldOptions}
+                            onChange={(e) => setNewFieldOptions(e.target.value)}
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                      )}
+
                       <Button
                         type="button"
                         onClick={handleCreateCustomField}
@@ -699,11 +729,12 @@ const DealersPage = () => {
                     <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Custom Fields</p>
                     {customFieldDefs.map((fdef) => {
                       const val = customValues[fdef.name] || '';
+                      const isRequired = fdef.is_required;
                       return (
                         <div key={fdef.id} className="space-y-1.5">
                           <Label htmlFor={`custom-${fdef.id}`} className="text-xs font-semibold text-slate-700 flex items-center justify-between">
                             <span>
-                              {fdef.name} {fdef.is_required && <span className="text-red-500">*</span>}
+                              {fdef.name} {isRequired && <span className="text-red-500">*</span>}
                             </span>
                             <span className="text-[9px] text-slate-400 font-mono capitalize">({fdef.field_type})</span>
                           </Label>
@@ -714,7 +745,7 @@ const DealersPage = () => {
                               placeholder={`Enter ${fdef.name}`}
                               value={val}
                               onChange={(e) => setCustomValues(prev => ({ ...prev, [fdef.name]: e.target.value }))}
-                              required={fdef.is_required}
+                              required={isRequired}
                               className="h-9 text-xs"
                             />
                           )}
@@ -726,7 +757,7 @@ const DealersPage = () => {
                               placeholder={`Enter ${fdef.name}`}
                               value={val}
                               onChange={(e) => setCustomValues(prev => ({ ...prev, [fdef.name]: e.target.value }))}
-                              required={fdef.is_required}
+                              required={isRequired}
                               className="h-9 text-xs"
                             />
                           )}
@@ -761,7 +792,7 @@ const DealersPage = () => {
                                       const file = e.target.files?.[0];
                                       if (file) handleCustomFileUpload(fdef.name, file);
                                     }}
-                                    required={fdef.is_required}
+                                    required={isRequired}
                                     disabled={uploadingField === fdef.name}
                                     className="text-xs h-9 cursor-pointer"
                                   />
@@ -770,6 +801,44 @@ const DealersPage = () => {
                                   )}
                                 </div>
                               )}
+                            </div>
+                          )}
+
+                          {fdef.field_type === 'checkbox' && (
+                            <div className="flex items-center space-x-2 pt-1">
+                              <input
+                                type="checkbox"
+                                id={`custom-${fdef.id}`}
+                                checked={!!val}
+                                onChange={(e) => setCustomValues(prev => ({ ...prev, [fdef.name]: e.target.checked }))}
+                                required={isRequired && !val}
+                                className="rounded border-slate-350 text-indigo-600 focus:ring-indigo-500 h-4.5 w-4.5 cursor-pointer"
+                              />
+                              <span
+                                className="text-xs text-slate-500 select-none cursor-pointer"
+                                onClick={() => setCustomValues(prev => ({ ...prev, [fdef.name]: !val }))}
+                              >
+                                Toggle Yes / No
+                              </span>
+                            </div>
+                          )}
+
+                          {fdef.field_type === 'radio' && (
+                            <div className="flex flex-wrap gap-4 pt-1">
+                              {(fdef.options || '').split(',').map((o) => o.trim()).filter(Boolean).map((opt) => (
+                                <label key={opt} className="flex items-center space-x-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                                  <input
+                                    type="radio"
+                                    name={`custom-radio-${fdef.id}`}
+                                    value={opt}
+                                    checked={val === opt}
+                                    onChange={() => setCustomValues(prev => ({ ...prev, [fdef.name]: opt }))}
+                                    required={isRequired && !val}
+                                    className="h-4.5 w-4.5 text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                                  />
+                                  <span>{opt}</span>
+                                </label>
+                              ))}
                             </div>
                           )}
                         </div>

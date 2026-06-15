@@ -39,6 +39,17 @@ def on_startup():
                 print("Migration: Successfully added 'custom_fields' column to 'dealer' table.")
             except Exception as e:
                 print(f"Migration error adding 'custom_fields' column: {e}")
+        
+        try:
+            conn.execute(text("SELECT options FROM dealercustomfield LIMIT 1"))
+        except Exception:
+            try:
+                # SQLite ALTER TABLE support
+                conn.execute(text("ALTER TABLE dealercustomfield ADD COLUMN options TEXT"))
+                conn.commit()
+                print("Migration: Successfully added 'options' column to 'dealercustomfield' table.")
+            except Exception as e:
+                print(f"Migration error adding 'options' column to 'dealercustomfield' table: {e}")
 
 # Mount uploads directory to serve files
 app.mount("/api/uploads", StaticFiles(directory="uploads"), name="uploads")

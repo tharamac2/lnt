@@ -84,6 +84,27 @@ def test_dealers_flow():
     assert response.status_code == 200, f"Failed to create custom field: {response.text}"
     cf2 = response.json()
 
+    # Radio Field
+    field3_data = {
+        "name": "Vendor Grade",
+        "field_type": "radio",
+        "is_required": True,
+        "options": "Grade A, Grade B, Grade C"
+    }
+    response = client.post("/api/dealers/custom-fields", json=field3_data, headers=headers)
+    assert response.status_code == 200
+    cf3 = response.json()
+    assert cf3["options"] == "Grade A, Grade B, Grade C"
+
+    # Checkbox Field
+    field4_data = {
+        "name": "Active Status Check",
+        "field_type": "checkbox",
+        "is_required": False
+    }
+    response = client.post("/api/dealers/custom-fields", json=field4_data, headers=headers)
+    assert response.status_code == 200
+
     # Test Duplicate Custom Field Name (Case-insensitive check)
     dup_field_data = {
         "name": "  trade license  ",
@@ -99,7 +120,7 @@ def test_dealers_flow():
     response = client.get("/api/dealers/custom-fields", headers=headers)
     assert response.status_code == 200
     fields_list = response.json()
-    assert len(fields_list) == 2, f"Expected 2 fields, got {len(fields_list)}"
+    assert len(fields_list) == 4, f"Expected 4 fields, got {len(fields_list)}"
     print("Listing custom fields passed")
 
     # Test Update Custom Field
@@ -218,8 +239,8 @@ def test_dealers_flow():
     response = client.get("/api/dealers/custom-fields", headers=headers)
     assert response.status_code == 200
     remaining_fields = response.json()
-    assert len(remaining_fields) == 1
-    assert remaining_fields[0]["id"] == cf1["id"]
+    assert len(remaining_fields) == 3
+    assert not any(f["id"] == cf2["id"] for f in remaining_fields)
     print("Delete custom field template passed")
 
     # 8. Verify Dealer Deletion
