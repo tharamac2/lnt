@@ -338,7 +338,7 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
       <div className="flex flex-1">
         {/* Sidebar - Desktop */}
         <aside
-          className={`hidden lg:flex flex-col bg-white border-r border-gray-200 transition-all duration-300 shrink-0 sticky top-16 h-[calc(100vh-4rem)] ${sidebarOpen ? 'w-64 overflow-y-auto' : 'w-0 overflow-hidden'
+          className={`hidden lg:flex flex-col bg-white border-r border-gray-200 transition-all duration-300 shrink-0 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto ${sidebarOpen ? 'w-64' : 'w-20'
             }`}
         >
           <nav className="p-4 space-y-1 flex-1">
@@ -348,13 +348,14 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
+                  title={!sidebarOpen ? item.label : undefined}
+                  className={`flex items-center gap-3 py-3 rounded-lg transition-colors ${sidebarOpen ? 'px-4' : 'justify-center px-2'} ${isActive
                     ? 'bg-[#1E3A8A] text-white'
                     : 'text-gray-700 hover:bg-gray-100'
                     }`}
                 >
                   {item.icon}
-                  <span>{item.label}</span>
+                  <span className={sidebarOpen ? '' : 'hidden'}>{item.label}</span>
                 </Link>
               );
             })}
