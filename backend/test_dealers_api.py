@@ -58,6 +58,55 @@ def test_dealers_flow():
     token = response.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
+    # 2b. Create Store User and test access
+    print("Creating store user...")
+    email_utils._otp_store["storedealer@example.com"] = {
+        "otp": "123456",
+        "expires_at": datetime.utcnow() + timedelta(minutes=10),
+        "verified": True
+    }
+    response = client.post(
+        "/api/users/",
+        json={
+            "username": "store_dealer_test",
+            "email": "storedealer@example.com",
+            "password": "storepassword123",
+            "role": "store",
+            "status": "active"
+        }
+    )
+    assert response.status_code == 200, f"Failed to create store user: {response.text}"
+
+    print("Logging in as store user...")
+    response = client.post(
+        "/api/users/token",
+        data={"username": "store_dealer_test", "password": "storepassword123"}
+    )
+    assert response.status_code == 200, f"Store login failed: {response.text}"
+    store_token = response.json()["access_token"]
+    store_headers = {"Authorization": f"Bearer {store_token}"}
+
+    # Quick authorization check for store user
+    response = client.get("/api/dealers/", headers=store_headers)
+    assert response.status_code == 200, "Store user should be authorized to read dealers"
+    
+    response = client.get("/api/dealers/custom-fields", headers=store_headers)
+    assert response.status_code == 200, "Store user should be authorized to read custom fields"
+
+    test_field = {
+        "name": "Store Custom Field Test",
+        "field_type": "text",
+        "is_required": False
+    }
+    response = client.post("/api/dealers/custom-fields", json=test_field, headers=store_headers)
+    assert response.status_code == 200, f"Store user should be authorized to create custom fields: {response.text}"
+    store_field_id = response.json()["id"]
+
+    # Delete custom field as store
+    response = client.delete(f"/api/dealers/custom-fields/{store_field_id}", headers=store_headers)
+    assert response.status_code == 200, "Store user should be authorized to delete custom fields"
+    print("Store user permissions validation passed successfully")
+
     # 3. Create Custom Fields
     print("\nTesting Custom Fields Configuration CRUD...")
     

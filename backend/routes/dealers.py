@@ -44,7 +44,7 @@ def create_dealer(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
+    if current_user.role not in ("admin", "store"):
         raise HTTPException(status_code=403, detail="Not authorized to manage dealers")
 
     payload.dealer_code = payload.dealer_code.strip().upper()
@@ -90,7 +90,7 @@ def create_custom_field(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
+    if current_user.role not in ("admin", "store"):
         raise HTTPException(status_code=403, detail="Not authorized to manage custom fields")
     
     payload.name = payload.name.strip()
@@ -126,7 +126,7 @@ def update_custom_field(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
+    if current_user.role not in ("admin", "store"):
         raise HTTPException(status_code=403, detail="Not authorized to manage custom fields")
 
     db_field = session.get(DealerCustomField, field_id)
@@ -176,7 +176,7 @@ def delete_custom_field(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
+    if current_user.role not in ("admin", "store"):
         raise HTTPException(status_code=403, detail="Not authorized to manage custom fields")
 
     db_field = session.get(DealerCustomField, field_id)
@@ -201,7 +201,7 @@ def delete_dealer(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
+    if current_user.role not in ("admin", "store"):
         raise HTTPException(status_code=403, detail="Not authorized to manage dealers")
 
     db_dealer = session.get(Dealer, dealer_id)
@@ -227,7 +227,7 @@ async def bulk_import_dealers(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
+    if current_user.role not in ("admin", "store"):
         raise HTTPException(status_code=403, detail="Not authorized to manage dealers")
 
     if not file.filename.endswith(('.xlsx', '.xls')):

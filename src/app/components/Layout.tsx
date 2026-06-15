@@ -145,7 +145,7 @@ const navItems: NavItem[] = [
     path: '/dealers',
     label: 'Add Dealers',
     icon: <Truck className="w-5 h-5" />,
-    roles: ['admin'],
+    roles: ['admin', 'store'],
   },
   {
     path: '/users',

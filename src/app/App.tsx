@@ -138,6 +138,7 @@ function App() {
               <Route path="/tools-movements" element={<ToolsMovements />} />
               <Route path="/tools-movement-history" element={<ToolsMovementHistory />} />
               <Route path="/inspection-employees" element={<InspectionEmployees />} />
+              <Route path="/dealers" element={<DealersPage />} />
             </>
           )}
 
