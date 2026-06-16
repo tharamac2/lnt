@@ -201,7 +201,7 @@ const Alerts = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="border-l-4 border-l-[#DC2626]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -314,7 +314,7 @@ const Alerts = () => {
                 <p className="text-gray-700 leading-relaxed">{selectedAlert.message}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div>
                   <label className="text-gray-500 text-xs">Tool ID</label>
                   <p className="font-medium text-gray-900">{selectedAlert.tool_id ? `Tool #${selectedAlert.tool_id}` : 'System'}</p>

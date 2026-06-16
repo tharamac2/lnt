@@ -221,7 +221,7 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
   return (
     <div className="min-h-screen flex flex-col bg-[#CFDBFF]">
       {/* Top Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-4">
             <Button
@@ -241,12 +241,12 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
               <Menu />
             </Button>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#1E3A8A] rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-[#1E3A8A] rounded-lg flex items-center justify-center shrink-0">
                 <Package className="w-6 h-6 text-white" />
               </div>
-              <div>
-                <h1 className="font-semibold text-[#0F172A]">Tool Management System</h1>
-                <p className="text-xs text-gray-500">Industrial & Construction</p>
+              <div className="hidden xs:block">
+                <h1 className="font-semibold text-[#0F172A] text-sm sm:text-base">Tool Management System</h1>
+                <p className="text-xs text-gray-500 hidden sm:block">Industrial & Construction</p>
               </div>
             </div>
           </div>
@@ -263,7 +263,7 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
                   )}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-80">
+              <DropdownMenuContent align="end" className="w-[min(320px,90vw)]">
                 <DropdownMenuLabel className="flex items-center justify-between">
                   <span>Notifications</span>
                   <Badge variant="secondary">{unreadCount} New</Badge>
@@ -321,7 +321,7 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
                   <ChevronDown className="w-4 h-4 text-gray-500" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent align="end" className="w-[min(224px,90vw)]">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">{user?.name}</p>
@@ -404,7 +404,7 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 min-w-0 p-6 overflow-x-hidden">
+        <main className="flex-1 min-w-0 p-3 sm:p-4 md:p-6 overflow-x-hidden" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           {children}
         </main>
       </div>

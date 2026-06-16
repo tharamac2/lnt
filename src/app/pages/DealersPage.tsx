@@ -559,9 +559,9 @@ const DealersPage = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Left Column: Form Panel */}
-        <div className="lg:col-span-1">
+        <div className="xl:col-span-1">
           <Card className="border border-gray-100 shadow-sm">
             <CardHeader className="border-b border-gray-50 pb-4">
               <CardTitle className="flex items-center gap-2 text-lg font-medium text-[#1E293B]">
@@ -1007,7 +1007,7 @@ const DealersPage = () => {
         </div>
 
         {/* Right Column: Tab Panels & Lists */}
-        <div className="lg:col-span-2">
+        <div className="xl:col-span-2">
           <Card className="border border-gray-100 shadow-sm h-full flex flex-col">
             <CardHeader className="border-b border-gray-50 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>

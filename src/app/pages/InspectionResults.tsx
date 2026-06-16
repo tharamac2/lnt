@@ -136,7 +136,7 @@ const InspectionResults = () => {
               <p>No inspections match your search.</p>
             </div>
           ) : (
-            <div className="max-h-[600px] overflow-auto">
+            <div className="max-h-[600px] overflow-x-auto overflow-y-auto">
               <Table>
                 <TableHeader className="bg-white sticky top-0 border-b border-gray-100 z-10 shadow-sm">
                   <TableRow>

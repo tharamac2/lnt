@@ -680,7 +680,7 @@ const Dashboard = ({ user }: { user?: User }) => {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                 <Card className="shadow-sm border-l-4 border-l-blue-500">
                     <CardContent className="p-6 flex items-center justify-between">
                         <div>
@@ -750,7 +750,7 @@ const Dashboard = ({ user }: { user?: User }) => {
             </div>
 
             {/* Main Charts Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* 1. Status Overview */}
                 <Card className="lg:col-span-1">
                     <CardHeader><CardTitle className="text-lg">Status Overview</CardTitle></CardHeader>
@@ -949,7 +949,7 @@ const Dashboard = ({ user }: { user?: User }) => {
                 </Card>
 
                 {/* 6. Recent Activity Feed (New) */}
-                <Card className="lg:col-span-3">
+                <Card className="md:col-span-2 lg:col-span-3">
                     <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Activity className="w-5 h-5" /> Recent Activity</CardTitle></CardHeader>
                     <CardContent>
                         <div className="max-h-[300px] overflow-y-auto pr-2 space-y-4">

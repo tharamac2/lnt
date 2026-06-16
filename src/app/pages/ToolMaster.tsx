@@ -234,17 +234,32 @@ const ToolMaster = ({ user }: { user?: User }) => {
 
   // Bulk selection for Existing Inventory table
   const [selectedToolIds, setSelectedToolIds] = useState<Set<number>>(new Set());
+  const lastSelectedIndexRef = useRef<number>(-1);
 
-  const toggleToolSelection = (toolId: number) => {
-    setSelectedToolIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(toolId)) {
-        next.delete(toolId);
-      } else {
-        next.add(toolId);
-      }
-      return next;
-    });
+  const toggleToolSelection = (toolId: number, shiftKey: boolean = false) => {
+    const currentIndex = filteredTools.findIndex((t) => t.id === toolId);
+    if (shiftKey && lastSelectedIndexRef.current >= 0) {
+      const start = Math.min(lastSelectedIndexRef.current, currentIndex);
+      const end = Math.max(lastSelectedIndexRef.current, currentIndex);
+      setSelectedToolIds((prev) => {
+        const next = new Set(prev);
+        for (let i = start; i <= end; i++) {
+          next.add(filteredTools[i].id);
+        }
+        return next;
+      });
+    } else {
+      setSelectedToolIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(toolId)) {
+          next.delete(toolId);
+        } else {
+          next.add(toolId);
+        }
+        return next;
+      });
+    }
+    lastSelectedIndexRef.current = currentIndex;
   };
 
   const allFilteredSelected = filteredTools.length > 0 &&
@@ -1431,19 +1446,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
             </div>
           </div>
 
-          {selectedToolIds.size > 0 && (
-            <div className="sticky top-16 z-20 px-3 py-2 border border-blue-100 rounded-md bg-blue-50 flex items-center justify-between gap-2 flex-wrap shadow-sm">
-              <span className="text-sm text-blue-800 font-medium">
-                {selectedToolIds.size} item{selectedToolIds.size === 1 ? '' : 's'} selected
-              </span>
-              <Button size="sm" variant="ghost" className="h-8 text-gray-500" onClick={clearSelection}>
-                <X className="w-3.5 h-3.5 mr-1.5" />
-                Clear
-              </Button>
-            </div>
-          )}
-
-          <div className="rounded-md border bg-white shadow-sm overflow-auto max-h-[500px] [&>div]:overflow-visible">
+          <div className="rounded-md border bg-white shadow-sm overflow-x-auto overflow-y-auto max-h-[500px] [&>div]:overflow-visible">
             <Table className="border-separate border-spacing-0">
               <TableHeader className="sticky top-0 z-10 shadow-sm [&_th]:bg-gray-50">
                 <TableRow>
@@ -1471,10 +1474,13 @@ const ToolMaster = ({ user }: { user?: User }) => {
                 {filteredTools.length > 0 ? (
                   filteredTools.map((tool) => (
                     <TableRow key={tool.id} className={`hover:bg-gray-50/50 ${selectedToolIds.has(tool.id) ? 'bg-blue-50/30' : ''}`}>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selectedToolIds.has(tool.id)}
-                          onCheckedChange={() => toggleToolSelection(tool.id)}
+                          onCheckedChange={(_, e?: React.MouseEvent) => {
+                            const nativeEvent = window.event as MouseEvent | undefined;
+                            toggleToolSelection(tool.id, nativeEvent?.shiftKey ?? false);
+                          }}
                           aria-label={`Select ${tool.description}`}
                         />
                       </TableCell>
@@ -1646,7 +1652,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-md" aria-hidden="true" />
 
           {/* Centered Card */}
-          <div className="relative z-50 w-96 p-6 bg-white/95 shadow-2xl rounded-xl border border-white/20 animate-in zoom-in-95 duration-200">
+          <div className="relative z-50 w-[min(384px,92vw)] p-6 bg-white/95 shadow-2xl rounded-xl border border-white/20 animate-in zoom-in-95 duration-200">
             <div className="space-y-4">
               <div className="flex justify-between items-start gap-4">
                 <div>

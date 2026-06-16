@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -44,6 +44,7 @@ const StoreInventory = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [makeFilter, setMakeFilter] = useState('all');
   const [selectedToolIds, setSelectedToolIds] = useState<Set<number>>(new Set());
+  const lastSelectedIndexRef = useRef<number>(-1);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -80,16 +81,30 @@ const StoreInventory = () => {
     });
   }, [inventoryTools, inventorySearch, statusFilter, makeFilter]);
 
-  const toggleToolSelection = (toolId: number) => {
-    setSelectedToolIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(toolId)) {
-        next.delete(toolId);
-      } else {
-        next.add(toolId);
-      }
-      return next;
-    });
+  const toggleToolSelection = (toolId: number, shiftKey: boolean = false) => {
+    const currentIndex = filteredInventoryTools.findIndex((t) => t.id === toolId);
+    if (shiftKey && lastSelectedIndexRef.current >= 0) {
+      const start = Math.min(lastSelectedIndexRef.current, currentIndex);
+      const end = Math.max(lastSelectedIndexRef.current, currentIndex);
+      setSelectedToolIds((prev) => {
+        const next = new Set(prev);
+        for (let i = start; i <= end; i++) {
+          next.add(filteredInventoryTools[i].id);
+        }
+        return next;
+      });
+    } else {
+      setSelectedToolIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(toolId)) {
+          next.delete(toolId);
+        } else {
+          next.add(toolId);
+        }
+        return next;
+      });
+    }
+    lastSelectedIndexRef.current = currentIndex;
   };
 
   const allFilteredSelected = filteredInventoryTools.length > 0 &&
@@ -281,7 +296,7 @@ const StoreInventory = () => {
         <CardContent className="p-0">
           {inventoryTools.length > 0 ? (
             filteredInventoryTools.length > 0 ? (
-              <div className="max-h-[500px] overflow-auto [&>div]:overflow-visible">
+              <div className="max-h-[500px] overflow-x-auto overflow-y-auto [&>div]:overflow-visible">
                 <Table className="border-separate border-spacing-0">
                   <TableHeader className="sticky top-0 border-b border-gray-100 z-10 shadow-sm [&_th]:bg-white">
                     <TableRow>
@@ -304,7 +319,10 @@ const StoreInventory = () => {
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={selectedToolIds.has(tool.id)}
-                            onCheckedChange={() => toggleToolSelection(tool.id)}
+                            onCheckedChange={() => {
+                              const nativeEvent = window.event as MouseEvent | undefined;
+                              toggleToolSelection(tool.id, nativeEvent?.shiftKey ?? false);
+                            }}
                             aria-label={`Select ${tool.description}`}
                           />
                         </TableCell>
