@@ -29,6 +29,20 @@ def on_startup():
     from .database import engine
     from sqlalchemy import text
     with engine.connect() as conn:
+        # Correct misspelled site names to TIRUNELVELI (e.g. TIRUNEVELI, thirunelveli)
+        try:
+            conn.execute(text("UPDATE tool SET current_site = 'TIRUNELVELI' WHERE LOWER(TRIM(current_site)) IN ('tiruneveli', 'thirunelveli')"))
+            conn.execute(text("UPDATE tool SET previous_site = 'TIRUNELVELI' WHERE LOWER(TRIM(previous_site)) IN ('tiruneveli', 'thirunelveli')"))
+            conn.execute(text("UPDATE tool SET next_site = 'TIRUNELVELI' WHERE LOWER(TRIM(next_site)) IN ('tiruneveli', 'thirunelveli')"))
+            conn.execute(text("UPDATE movementhistory SET from_site = 'TIRUNELVELI' WHERE LOWER(TRIM(from_site)) IN ('tiruneveli', 'thirunelveli')"))
+            conn.execute(text("UPDATE movementhistory SET to_site = 'TIRUNELVELI' WHERE LOWER(TRIM(to_site)) IN ('tiruneveli', 'thirunelveli')"))
+            conn.execute(text("UPDATE alert SET site = 'TIRUNELVELI' WHERE LOWER(TRIM(site)) IN ('tiruneveli', 'thirunelveli')"))
+            conn.execute(text("UPDATE auditlog SET site = 'TIRUNELVELI' WHERE LOWER(TRIM(site)) IN ('tiruneveli', 'thirunelveli')"))
+            conn.commit()
+            print("Migration: Successfully updated misspelled site names to TIRUNELVELI.")
+        except Exception as e:
+            print(f"Migration error updating site names: {e}")
+
         try:
             conn.execute(text("SELECT custom_fields FROM dealer LIMIT 1"))
         except Exception:
