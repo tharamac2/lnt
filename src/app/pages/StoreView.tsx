@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   User,
   Truck,
+  Wrench,
 } from 'lucide-react';
 import api from '../services/api';
 import { toast } from 'sonner';
@@ -38,6 +39,11 @@ const StoreView = () => {
   // Incident State
   const [isIncidentMode, setIsIncidentMode] = useState(false);
   const [incidentDebitTo, setIncidentDebitTo] = useState('');
+
+  // Repair Completion State
+  const [repairResult, setRepairResult] = useState<'pass' | 'not_pass' | null>(null);
+  const [repairScrapDealer, setRepairScrapDealer] = useState('');
+  const [repairRemarks, setRepairRemarks] = useState('');
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -293,6 +299,33 @@ const StoreView = () => {
     } catch (error) {
       console.error(error);
       toast.error("Failed to report incident");
+    }
+  };
+
+  const handleRepairComplete = async () => {
+    if (!scannedTool || !repairResult) return;
+    try {
+      if (repairResult === 'pass') {
+        await api.patch(`/tools/${scannedTool.id}`, {
+          status: 'usable',
+          remarks: `Repair completed — PASSED. Tool restored to usable. ${repairRemarks}`.trim(),
+        });
+        toast.success('Tool marked as Usable after repair.');
+      } else {
+        await api.patch(`/tools/${scannedTool.id}`, {
+          status: 'scrap',
+          debit_to: repairScrapDealer || null,
+          remarks: `Repair completed — NOT PASSED. Issued to scrap dealer${repairScrapDealer ? ': ' + repairScrapDealer : ''}. ${repairRemarks}`.trim(),
+        });
+        toast.success('Tool issued to scrap dealer after failed repair.');
+      }
+      setRepairResult(null);
+      setRepairScrapDealer('');
+      setRepairRemarks('');
+      refreshTool();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to update repair result');
     }
   };
 
@@ -693,6 +726,81 @@ const StoreView = () => {
                       Mark as STOLEN
                     </Button>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Repair Completion Card */}
+              <Card className="border-amber-200 mt-4">
+                <CardHeader className="bg-amber-50">
+                  <CardTitle className="text-amber-800 flex items-center gap-2">
+                    <Wrench className="w-5 h-5" />
+                    Repair Completed
+                  </CardTitle>
+                  <CardDescription>
+                    Update the tool status after repair is done — mark as Usable or send to Scrap Dealer.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-5 pt-6">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-700">Repair Result</Label>
+                    <div className="flex gap-6">
+                      <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                        <input
+                          type="radio"
+                          name="repairResult"
+                          value="pass"
+                          checked={repairResult === 'pass'}
+                          onChange={() => setRepairResult('pass')}
+                          className="w-4 h-4 text-green-600 focus:ring-green-500"
+                        />
+                        <span className="font-medium text-green-700">Pass — Tool is Usable</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                        <input
+                          type="radio"
+                          name="repairResult"
+                          value="not_pass"
+                          checked={repairResult === 'not_pass'}
+                          onChange={() => setRepairResult('not_pass')}
+                          className="w-4 h-4 text-red-600 focus:ring-red-500"
+                        />
+                        <span className="font-medium text-red-700">Not Pass — Issue to Scrap Dealer</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {repairResult === 'not_pass' && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-700">Scrap Dealer Name</Label>
+                      <div className="flex gap-2">
+                        <Truck className="w-5 h-5 text-gray-400 mt-2" />
+                        <Input
+                          placeholder="Enter scrap dealer name"
+                          value={repairScrapDealer}
+                          onChange={(e) => setRepairScrapDealer(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-700">Remarks (optional)</Label>
+                    <Input
+                      placeholder="Any additional notes about the repair..."
+                      value={repairRemarks}
+                      onChange={(e) => setRepairRemarks(e.target.value)}
+                    />
+                  </div>
+
+                  <Button
+                    className={`w-full font-semibold ${repairResult === 'pass' ? 'bg-green-600 hover:bg-green-700 text-white' : repairResult === 'not_pass' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                    disabled={!repairResult}
+                    onClick={handleRepairComplete}
+                  >
+                    {repairResult === 'pass' && 'Confirm — Mark Tool as Usable'}
+                    {repairResult === 'not_pass' && 'Confirm — Issue to Scrap Dealer'}
+                    {!repairResult && 'Select a repair result above'}
+                  </Button>
                 </CardContent>
               </Card>
             </TabsContent>
