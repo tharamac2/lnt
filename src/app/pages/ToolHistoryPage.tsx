@@ -422,7 +422,7 @@ const ToolHistoryPage = () => {
         </CardContent>
       </Card>      {/* Lifecycle Details Dialog */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="max-w-6xl w-[90vw] max-h-[90vh] overflow-y-auto bg-slate-50">
+        <DialogContent className="max-w-6xl sm:max-w-6xl w-[90vw] max-h-[90vh] overflow-y-auto bg-slate-50">
           <DialogHeader className="bg-white p-6 border-b border-gray-150 rounded-t-lg -mx-6 -mt-6">
             <DialogTitle className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2.5">
