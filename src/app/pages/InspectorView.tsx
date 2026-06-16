@@ -44,6 +44,7 @@ const InspectorView = () => {
   const [loadingTools, setLoadingTools] = useState(false);
   const [inventorySearch, setInventorySearch] = useState('');
   const [selectedToolIds, setSelectedToolIds] = useState<Set<number>>(new Set());
+  const lastSelectedIndexRef = useRef<number>(-1);
 
   const fetchEmployeeRecords = async () => {
     try {
@@ -108,16 +109,24 @@ const InspectorView = () => {
   const allFilteredSelected = filteredSiteTools.length > 0 &&
     filteredSiteTools.every((tool) => selectedToolIds.has(tool.id));
 
-  const toggleToolSelection = (toolId: number) => {
-    setSelectedToolIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(toolId)) {
-        next.delete(toolId);
-      } else {
-        next.add(toolId);
-      }
-      return next;
-    });
+  const toggleToolSelection = (toolId: number, shiftKey: boolean = false) => {
+    const currentIndex = filteredSiteTools.findIndex((t) => t.id === toolId);
+    if (shiftKey && lastSelectedIndexRef.current >= 0) {
+      const start = Math.min(lastSelectedIndexRef.current, currentIndex);
+      const end = Math.max(lastSelectedIndexRef.current, currentIndex);
+      setSelectedToolIds((prev) => {
+        const next = new Set(prev);
+        for (let i = start; i <= end; i++) next.add(filteredSiteTools[i].id);
+        return next;
+      });
+    } else {
+      setSelectedToolIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(toolId)) next.delete(toolId); else next.add(toolId);
+        return next;
+      });
+    }
+    lastSelectedIndexRef.current = currentIndex;
   };
 
   const toggleSelectAll = () => {
@@ -441,12 +450,15 @@ const InspectorView = () => {
                       <TableRow
                         key={tool.id}
                         className="hover:bg-blue-50/20 cursor-pointer"
-                        onClick={() => toggleToolSelection(tool.id)}
+                        onClick={(e) => toggleToolSelection(tool.id, e.shiftKey)}
                       >
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={selectedToolIds.has(tool.id)}
-                            onCheckedChange={() => toggleToolSelection(tool.id)}
+                            onCheckedChange={() => {
+                              const nativeEvent = window.event as MouseEvent | undefined;
+                              toggleToolSelection(tool.id, nativeEvent?.shiftKey ?? false);
+                            }}
                             aria-label={`Select ${tool.description}`}
                           />
                         </TableCell>
