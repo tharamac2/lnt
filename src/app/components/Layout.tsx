@@ -242,7 +242,7 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
               <Menu />
             </Button>
             <div className="flex items-center gap-3">
-              <img src={ltLogo} alt="L&T Logo" className="w-10 h-10 object-contain shrink-0" />
+              <img src={ltLogo} alt="L&T Logo" className="w-12 h-12 object-contain shrink-0" />
               <div>
                 <h1 className="font-semibold text-[#0F172A] text-sm sm:text-base leading-tight">Tool Management System</h1>
                 <p className="text-xs text-[#1E3A8A] font-medium hidden sm:block">Industrial & Construction</p>
