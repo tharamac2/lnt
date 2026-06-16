@@ -44,6 +44,7 @@ const StoreView = () => {
   const [repairResult, setRepairResult] = useState<'pass' | 'not_pass' | null>(null);
   const [repairScrapDealer, setRepairScrapDealer] = useState('');
   const [repairRemarks, setRepairRemarks] = useState('');
+  const [repairValidityYears, setRepairValidityYears] = useState('');
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -308,7 +309,8 @@ const StoreView = () => {
       if (repairResult === 'pass') {
         await api.patch(`/tools/${scannedTool.id}`, {
           status: 'usable',
-          remarks: `Repair completed — PASSED. Tool restored to usable. ${repairRemarks}`.trim(),
+          validity_period: repairValidityYears ? parseInt(repairValidityYears) : undefined,
+          remarks: `Repair completed — PASSED. Tool restored to usable. Validity: ${repairValidityYears ? repairValidityYears + ' year(s)' : 'not set'}. ${repairRemarks}`.trim(),
         });
         toast.success('Tool marked as Usable after repair.');
       } else {
@@ -322,6 +324,7 @@ const StoreView = () => {
       setRepairResult(null);
       setRepairScrapDealer('');
       setRepairRemarks('');
+      setRepairValidityYears('');
       refreshTool();
     } catch (error) {
       console.error(error);
@@ -768,6 +771,25 @@ const StoreView = () => {
                       </label>
                     </div>
                   </div>
+
+                  {repairResult === 'pass' && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-700">Valid for (years)</Label>
+                      <select
+                        value={repairValidityYears}
+                        onChange={(e) => setRepairValidityYears(e.target.value)}
+                        className="w-full h-10 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      >
+                        <option value="">Select validity period</option>
+                        <option value="1">0 – 1 year</option>
+                        <option value="2">1 – 2 years</option>
+                        <option value="4">3 – 4 years</option>
+                        <option value="6">5 – 6 years</option>
+                        <option value="7">6 – 7 years</option>
+                        <option value="8">7 – 8 years</option>
+                      </select>
+                    </div>
+                  )}
 
                   {repairResult === 'not_pass' && (
                     <div className="space-y-2">
