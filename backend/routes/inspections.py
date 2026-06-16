@@ -97,9 +97,9 @@ def create_inspection(inspection: InspectionCreate, session: Session = Depends(g
     session.refresh(db_inspection)
     return db_inspection
 
-@router.get("/tool/{tool_id}", response_model=List[InspectionRead])
+@router.get("/tool/{tool_id}", response_model=List[InspectionReadWithTool])
 def read_inspections_by_tool(tool_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    statement = select(Inspection).where(Inspection.tool_id == tool_id)
+    statement = select(Inspection).where(Inspection.tool_id == tool_id).options(joinedload(Inspection.inspector))
     inspections = session.exec(statement).all()
     return inspections
 

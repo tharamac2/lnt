@@ -70,6 +70,12 @@ const navItems: NavItem[] = [
     roles: ['admin'],
   },
   {
+    path: '/tool-history',
+    label: 'Tool History',
+    icon: <History className="w-5 h-5" />,
+    roles: ['admin'],
+  },
+  {
     path: '/store-view',
     label: 'QR Scanner',
     icon: <QrCode className="w-5 h-5" />,
