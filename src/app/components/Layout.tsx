@@ -25,7 +25,7 @@ import {
   Building2,
   Sliders,
 } from 'lucide-react';
-import ltLogo from '../../assets/lt-logo.png';
+import ltLogo from '../../assets/LNT.png';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import {
