@@ -215,7 +215,7 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
   return (
     <div className="min-h-screen flex flex-col bg-[#CFDBFF]">
       {/* Top Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-4">
             <Button
@@ -398,7 +398,7 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 min-w-0 p-3 sm:p-4 md:p-6 overflow-x-hidden">
+        <main className="flex-1 min-w-0 p-3 sm:p-4 md:p-6 overflow-x-hidden" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           {children}
         </main>
       </div>
