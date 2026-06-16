@@ -1446,7 +1446,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
             </div>
           </div>
 
-          <div className="rounded-md border bg-white shadow-sm overflow-auto max-h-[500px] [&>div]:overflow-visible">
+          <div className="rounded-md border bg-white shadow-sm overflow-x-auto overflow-y-auto max-h-[500px] [&>div]:overflow-visible">
             <Table className="border-separate border-spacing-0">
               <TableHeader className="sticky top-0 z-10 shadow-sm [&_th]:bg-gray-50">
                 <TableRow>
@@ -1652,7 +1652,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-md" aria-hidden="true" />
 
           {/* Centered Card */}
-          <div className="relative z-50 w-96 p-6 bg-white/95 shadow-2xl rounded-xl border border-white/20 animate-in zoom-in-95 duration-200">
+          <div className="relative z-50 w-[min(384px,92vw)] p-6 bg-white/95 shadow-2xl rounded-xl border border-white/20 animate-in zoom-in-95 duration-200">
             <div className="space-y-4">
               <div className="flex justify-between items-start gap-4">
                 <div>

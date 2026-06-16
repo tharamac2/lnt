@@ -296,7 +296,7 @@ const StoreInventory = () => {
         <CardContent className="p-0">
           {inventoryTools.length > 0 ? (
             filteredInventoryTools.length > 0 ? (
-              <div className="max-h-[500px] overflow-auto [&>div]:overflow-visible">
+              <div className="max-h-[500px] overflow-x-auto overflow-y-auto [&>div]:overflow-visible">
                 <Table className="border-separate border-spacing-0">
                   <TableHeader className="sticky top-0 border-b border-gray-100 z-10 shadow-sm [&_th]:bg-white">
                     <TableRow>

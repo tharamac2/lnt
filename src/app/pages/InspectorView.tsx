@@ -428,7 +428,7 @@ const InspectorView = () => {
                 <p>No tools match your search.</p>
               </div>
             ) : (
-              <div className="max-h-[420px] overflow-auto [&>div]:overflow-visible">
+              <div className="max-h-[420px] overflow-x-auto overflow-y-auto [&>div]:overflow-visible">
                 <Table className="border-separate border-spacing-0">
                   <TableHeader className="sticky top-0 border-b border-gray-100 z-10 shadow-sm [&_th]:bg-white">
                     <TableRow>
@@ -493,7 +493,7 @@ const InspectorView = () => {
                 <CardTitle>Tool Summary</CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-400">Tool ID</p>
                     <p className="font-mono font-medium">{selectedTools[0].id}</p>

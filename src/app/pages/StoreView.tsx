@@ -432,7 +432,7 @@ const StoreView = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wider">Job Code</p>
                   <p className="font-semibold text-gray-900">{scannedTool.job_code || '-'}</p>

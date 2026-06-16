@@ -181,7 +181,7 @@ const InspectionEmployees = () => {
               <p>No employee profiles match your search.</p>
             </div>
           ) : (
-            <div className="max-h-[600px] overflow-auto [&>div]:overflow-visible">
+            <div className="max-h-[600px] overflow-x-auto overflow-y-auto [&>div]:overflow-visible">
               <Table className="border-separate border-spacing-0">
                 <TableHeader className="sticky top-0 border-b border-gray-100 z-10 shadow-sm [&_th]:bg-white">
                   <TableRow>
@@ -265,7 +265,7 @@ const InspectionEmployees = () => {
               <p>This employee has not submitted any inspections yet.</p>
             </div>
           ) : (
-            <div className="max-h-[400px] overflow-auto [&>div]:overflow-visible">
+            <div className="max-h-[400px] overflow-x-auto overflow-y-auto [&>div]:overflow-visible">
               <Table className="border-separate border-spacing-0">
                 <TableHeader className="sticky top-0 border-b border-gray-100 z-10 shadow-sm [&_th]:bg-white">
                   <TableRow>
