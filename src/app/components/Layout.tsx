@@ -238,8 +238,8 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
               <div className="w-10 h-10 bg-[#1E3A8A] rounded-lg flex items-center justify-center shrink-0">
                 <Package className="w-6 h-6 text-white" />
               </div>
-              <div className="hidden xs:block">
-                <h1 className="font-semibold text-[#0F172A] text-sm sm:text-base">Tool Management System</h1>
+              <div>
+                <h1 className="font-semibold text-[#0F172A] text-sm sm:text-base leading-tight">Tool Management System</h1>
                 <p className="text-xs text-gray-500 hidden sm:block">Industrial & Construction</p>
               </div>
             </div>
@@ -369,8 +369,34 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
 
         {/* Sidebar - Mobile */}
         {mobileMenuOpen && (
-          <div className="lg:hidden fixed inset-0 z-40 bg-black bg-opacity-50" onClick={() => setMobileMenuOpen(false)}>
-            <aside className="w-64 bg-white h-full flex flex-col overflow-y-auto scrollbar-hide" onClick={(e) => e.stopPropagation()}>
+          <>
+            {/* Backdrop */}
+            <div
+              className="lg:hidden fixed inset-0 z-40 bg-black/50"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            {/* Drawer */}
+            <aside
+              className="lg:hidden fixed top-0 left-0 z-50 w-72 bg-white flex flex-col overflow-y-auto scrollbar-hide"
+              style={{
+                height: '100dvh',
+                paddingTop: 'env(safe-area-inset-top)',
+                paddingBottom: 'env(safe-area-inset-bottom)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Sidebar header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-[#1E3A8A] rounded-lg flex items-center justify-center">
+                    <Package className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="font-semibold text-sm text-[#0F172A]">Menu</span>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
               <nav className="p-4 space-y-1 flex-1">
                 {filteredNavItems.map((item) => {
                   const isActive = location.pathname === item.path;
@@ -378,7 +404,7 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
                     <Link
                       key={item.path}
                       to={item.path}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
+                      className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-sm ${isActive
                         ? 'bg-[#1E3A8A] text-white'
                         : 'text-gray-700 hover:bg-gray-100'
                         }`}
@@ -390,11 +416,11 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
                   );
                 })}
               </nav>
-              <div className="p-4 border-t border-gray-100 text-center mt-auto">
+              <div className="p-4 border-t border-gray-100 text-center">
                 <p className="text-[10px] text-gray-400 font-medium">UJ Enterprises & Tharamac &copy; 2026<br />QR Tool Management System</p>
               </div>
             </aside>
-          </div>
+          </>
         )}
 
         {/* Main Content */}
