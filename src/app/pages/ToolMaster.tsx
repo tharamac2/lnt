@@ -234,6 +234,8 @@ const ToolMaster = ({ user }: { user?: User }) => {
 
   // Bulk selection for Existing Inventory table
   const [selectedToolIds, setSelectedToolIds] = useState<Set<number>>(new Set());
+  const [bulkSelectCount, setBulkSelectCount] = useState('');
+  const [bulkSelectMode, setBulkSelectMode] = useState<'range' | 'random'>('range');
 
   const toggleToolSelection = (toolId: number) => {
     setSelectedToolIds((prev) => {
@@ -264,6 +266,20 @@ const ToolMaster = ({ user }: { user?: User }) => {
   };
 
   const clearSelection = () => setSelectedToolIds(new Set());
+
+  const applyBulkSelect = () => {
+    const count = parseInt(bulkSelectCount);
+    if (!count || count <= 0 || filteredTools.length === 0) return;
+    const n = Math.min(count, filteredTools.length);
+    if (bulkSelectMode === 'range') {
+      const ids = filteredTools.slice(0, n).map((t) => t.id);
+      setSelectedToolIds(new Set(ids));
+    } else {
+      const shuffled = [...filteredTools].sort(() => Math.random() - 0.5);
+      const ids = shuffled.slice(0, n).map((t) => t.id);
+      setSelectedToolIds(new Set(ids));
+    }
+  };
 
   const selectedTools = useMemo(
     () => filteredTools.filter((tool) => selectedToolIds.has(tool.id)),
@@ -1431,17 +1447,44 @@ const ToolMaster = ({ user }: { user?: User }) => {
             </div>
           </div>
 
-          {selectedToolIds.size > 0 && (
-            <div className="sticky top-16 z-20 px-3 py-2 border border-blue-100 rounded-md bg-blue-50 flex items-center justify-between gap-2 flex-wrap shadow-sm">
-              <span className="text-sm text-blue-800 font-medium">
-                {selectedToolIds.size} item{selectedToolIds.size === 1 ? '' : 's'} selected
-              </span>
-              <Button size="sm" variant="ghost" className="h-8 text-gray-500" onClick={clearSelection}>
-                <X className="w-3.5 h-3.5 mr-1.5" />
-                Clear
-              </Button>
+          {/* Bulk Select Controls */}
+          <div className="flex flex-wrap items-center gap-2 px-1 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+            <span className="text-xs font-semibold text-gray-600 whitespace-nowrap">Bulk Select:</span>
+            <div className="flex items-center gap-1 border border-gray-200 rounded-md overflow-hidden bg-white">
+              <button
+                onClick={() => setBulkSelectMode('range')}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${bulkSelectMode === 'range' ? 'bg-[#1E3A8A] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                Range
+              </button>
+              <button
+                onClick={() => setBulkSelectMode('random')}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${bulkSelectMode === 'random' ? 'bg-[#1E3A8A] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                Random
+              </button>
             </div>
-          )}
+            <input
+              type="number"
+              min={1}
+              max={filteredTools.length}
+              value={bulkSelectCount}
+              onChange={(e) => setBulkSelectCount(e.target.value)}
+              placeholder={`1 – ${filteredTools.length}`}
+              className="w-28 h-8 px-2 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
+            />
+            <Button size="sm" className="h-8 text-xs bg-[#1E3A8A] hover:bg-[#1E3A8A]/90" onClick={applyBulkSelect} disabled={!bulkSelectCount || filteredTools.length === 0}>
+              Apply
+            </Button>
+            {selectedToolIds.size > 0 && (
+              <span className="text-xs text-blue-700 font-medium ml-1">{selectedToolIds.size} selected</span>
+            )}
+            {selectedToolIds.size > 0 && (
+              <Button size="sm" variant="ghost" className="h-8 text-xs text-gray-500 ml-auto" onClick={clearSelection}>
+                <X className="w-3 h-3 mr-1" /> Clear
+              </Button>
+            )}
+          </div>
 
           <div className="rounded-md border bg-white shadow-sm overflow-auto max-h-[500px] [&>div]:overflow-visible">
             <Table className="border-separate border-spacing-0">
