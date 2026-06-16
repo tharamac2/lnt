@@ -44,8 +44,6 @@ const StoreInventory = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [makeFilter, setMakeFilter] = useState('all');
   const [selectedToolIds, setSelectedToolIds] = useState<Set<number>>(new Set());
-  const [bulkSelectCount, setBulkSelectCount] = useState('');
-  const [bulkSelectMode, setBulkSelectMode] = useState<'range' | 'random'>('range');
   const lastSelectedIndexRef = useRef<number>(-1);
 
   const getStatusColor = (status: string) => {
@@ -126,18 +124,6 @@ const StoreInventory = () => {
   };
 
   const clearSelection = () => setSelectedToolIds(new Set());
-
-  const applyBulkSelect = () => {
-    const count = parseInt(bulkSelectCount);
-    if (!count || count <= 0 || filteredInventoryTools.length === 0) return;
-    const n = Math.min(count, filteredInventoryTools.length);
-    if (bulkSelectMode === 'range') {
-      setSelectedToolIds(new Set(filteredInventoryTools.slice(0, n).map((t) => t.id)));
-    } else {
-      const shuffled = [...filteredInventoryTools].sort(() => Math.random() - 0.5);
-      setSelectedToolIds(new Set(shuffled.slice(0, n).map((t) => t.id)));
-    }
-  };
 
   const selectedTools = useMemo(
     () => inventoryTools.filter((tool) => selectedToolIds.has(tool.id)),
@@ -271,45 +257,6 @@ const StoreInventory = () => {
             </Select>
           </div>
         )}
-
-        {/* Bulk Select Controls */}
-        <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg mb-2">
-          <span className="text-xs font-semibold text-gray-600 whitespace-nowrap">Bulk Select:</span>
-          <div className="flex items-center gap-1 border border-gray-200 rounded-md overflow-hidden bg-white">
-            <button
-              onClick={() => setBulkSelectMode('range')}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${bulkSelectMode === 'range' ? 'bg-[#1E3A8A] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-            >
-              Range
-            </button>
-            <button
-              onClick={() => setBulkSelectMode('random')}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${bulkSelectMode === 'random' ? 'bg-[#1E3A8A] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-            >
-              Random
-            </button>
-          </div>
-          <input
-            type="number"
-            min={1}
-            max={filteredInventoryTools.length}
-            value={bulkSelectCount}
-            onChange={(e) => setBulkSelectCount(e.target.value)}
-            placeholder={`1 – ${filteredInventoryTools.length}`}
-            className="w-28 h-8 px-2 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
-          />
-          <Button size="sm" className="h-8 text-xs bg-[#1E3A8A] hover:bg-[#1E3A8A]/90" onClick={applyBulkSelect} disabled={!bulkSelectCount || filteredInventoryTools.length === 0}>
-            Apply
-          </Button>
-          {selectedToolIds.size > 0 && (
-            <span className="text-xs text-blue-700 font-medium ml-1">{selectedToolIds.size} selected</span>
-          )}
-          {selectedToolIds.size > 0 && (
-            <Button size="sm" variant="ghost" className="h-8 text-xs text-gray-500 ml-auto" onClick={clearSelection}>
-              <X className="w-3 h-3 mr-1" /> Clear
-            </Button>
-          )}
-        </div>
 
         {/* Bulk Selection Toolbar */}
         {selectedToolIds.size > 0 && (
