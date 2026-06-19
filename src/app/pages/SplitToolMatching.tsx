@@ -89,12 +89,12 @@ const SplitToolMatching = () => {
               setResult('mismatch');
             } else {
               try {
-                // Fetch all tools at this site to find the total N of Derrick Poles
-                const siteToolsRes = await api.get(`/tools/public/site/${partADetails.current_site}`);
-                const siteTools = siteToolsRes.data;
+                // Fetch all tools in the same upload batch as Part A to find the total N of Derrick Poles
+                const batchToolsRes = await api.get(`/tools/public/batch/${partA}`);
+                const batchTools = batchToolsRes.data;
 
                 // Filter for Derrick Poles
-                const derrickPoles = siteTools.filter((t: any) => isDerrickPole(t.description));
+                const derrickPoles = batchTools.filter((t: any) => isDerrickPole(t.description));
 
                 // Extract sequence number suffix from QR code
                 const getQrSuffix = (qr: string) => {

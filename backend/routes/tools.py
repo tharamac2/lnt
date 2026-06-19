@@ -378,3 +378,23 @@ def read_public_tools_by_site(site: str, session: Session = Depends(get_session)
     query = query.where(func.lower(func.trim(Tool.current_site)) == site.strip().lower())
     tools = session.exec(query).all()
     return tools
+
+@router.get("/public/batch/{qr_code}", response_model=List[ToolRead])
+def read_public_batch_tools(qr_code: str, session: Session = Depends(get_session)):
+    statement = select(Tool).where(Tool.qr_code == qr_code)
+    tool = session.exec(statement).first()
+    if not tool:
+        raise HTTPException(status_code=404, detail="Tool not found")
+        
+    created_at = tool.created_at
+    if not created_at:
+        return [tool]
+        
+    from datetime import timedelta
+    start_time = created_at - timedelta(seconds=10)
+    end_time = created_at + timedelta(seconds=10)
+    
+    query = select(Tool).where(Tool.created_at >= start_time, Tool.created_at <= end_time)
+    tools = session.exec(query).all()
+    return tools
+
