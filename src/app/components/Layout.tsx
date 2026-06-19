@@ -25,6 +25,7 @@ import {
   Building2,
   Sliders,
 } from 'lucide-react';
+import ltLogo from '../../assets/LNT.png';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import {
@@ -241,12 +242,10 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
               <Menu />
             </Button>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#1E3A8A] rounded-lg flex items-center justify-center shrink-0">
-                <Package className="w-6 h-6 text-white" />
-              </div>
+              <img src={ltLogo} alt="L&T Logo" className="w-12 h-12 object-contain shrink-0" />
               <div>
                 <h1 className="font-semibold text-[#0F172A] text-sm sm:text-base leading-tight">Tool Management System</h1>
-                <p className="text-xs text-gray-500 hidden sm:block">Industrial & Construction</p>
+                <p className="text-xs text-[#1E3A8A] font-medium hidden sm:block">Industrial & Construction</p>
               </div>
             </div>
           </div>
@@ -394,9 +393,7 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
               {/* Sidebar header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-[#1E3A8A] rounded-lg flex items-center justify-center">
-                    <Package className="w-4 h-4 text-white" />
-                  </div>
+                  <img src={ltLogo} alt="L&T Logo" className="w-8 h-8 object-contain shrink-0" />
                   <span className="font-semibold text-sm text-[#0F172A]">Menu</span>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)}>
