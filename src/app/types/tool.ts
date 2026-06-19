@@ -18,6 +18,7 @@ export interface Tool {
   qrCode: string;
   status: 'usable' | 'scrap';
   expiryDate: string;
+  exact_match?: string;
 }
 
 export interface Inspection {

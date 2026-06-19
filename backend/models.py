@@ -104,6 +104,7 @@ class ToolCreate(ToolBase):
 
 class ToolRead(ToolBase):
     id: int
+    exact_match: Optional[str] = None
 
 class ToolReadWithCreator(ToolRead):
     creator: Optional[UserRead] = None

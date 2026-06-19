@@ -8,6 +8,69 @@ from ..audit import log_action
 
 router = APIRouter(prefix="/tools", tags=["tools"])
 
+def populate_exact_matches(tools: List[Tool], session: Session) -> List[ToolRead]:
+    tool_reads = []
+    
+    def is_derrick_pole(desc):
+        d = (desc or '').lower().strip()
+        return ('derrick' in d and 'pole' in d) or ('dirreck' in d and 'pole' in d)
+        
+    derrick_poles = [t for t in tools if is_derrick_pole(t.description)]
+    
+    if not derrick_poles:
+        for t in tools:
+            tr = ToolRead.from_orm(t)
+            tr.exact_match = "-"
+            tool_reads.append(tr)
+        return tool_reads
+        
+    timestamps = [t.created_at for t in derrick_poles if t.created_at]
+    batches = []
+    from datetime import timedelta
+    for ts in timestamps:
+        matched = False
+        for start, end in batches:
+            if start <= ts <= end:
+                matched = True
+                break
+        if not matched:
+            batches.append((ts - timedelta(seconds=10), ts + timedelta(seconds=10)))
+            
+    match_map = {}
+    for start, end in batches:
+        batch_tools = session.exec(
+            select(Tool).where(Tool.created_at >= start, Tool.created_at <= end)
+        ).all()
+        
+        batch_derrick_poles = [t for t in batch_tools if is_derrick_pole(t.description)]
+        
+        def get_qr_suffix(qr):
+            import re
+            match = re.search(r'\d+$', qr)
+            return int(match.group(0)) if match else 0
+            
+        batch_derrick_poles.sort(key=lambda t: get_qr_suffix(t.qr_code))
+        
+        N = len(batch_derrick_poles)
+        half = N // 2
+        if N >= 2 and half > 0:
+            for i, t in enumerate(batch_derrick_poles):
+                if i < half:
+                    match_t = batch_derrick_poles[i + half]
+                else:
+                    match_t = batch_derrick_poles[i - half]
+                match_map[t.qr_code] = match_t.qr_code
+                
+    for t in tools:
+        tr = ToolRead.from_orm(t)
+        if is_derrick_pole(t.description):
+            tr.exact_match = match_map.get(t.qr_code, "-")
+        else:
+            tr.exact_match = "-"
+        tool_reads.append(tr)
+        
+    return tool_reads
+
 def resequence_unprinted_tools(session: Session, deleted_qr_code: str):
     """
     Resequence all active unprinted tools in the database that have a serial number
@@ -99,7 +162,7 @@ def create_tool(tool: ToolCreate, session: Session = Depends(get_session), curre
     )
     session.commit()
 
-    return db_tool
+    return populate_exact_matches([db_tool], session)[0]
 
 @router.get("/sites/", response_model=List[str])
 def read_sites(session: Session = Depends(get_session)):
@@ -145,7 +208,7 @@ def read_tools(
         query = query.where(Tool.created_by_id == created_by)
     
     tools = session.exec(query.offset(offset).limit(limit)).all()
-    return tools
+    return populate_exact_matches(tools, session)
 
 from pydantic import BaseModel
 class MarkPrintedRequest(BaseModel):
@@ -177,7 +240,7 @@ def read_tool(tool_id: int, session: Session = Depends(get_session), current_use
     tool = session.get(Tool, tool_id)
     if not tool:
         raise HTTPException(status_code=404, detail="Tool not found")
-    return tool
+    return populate_exact_matches([tool], session)[0]
 
 @router.patch("/{tool_id}", response_model=ToolRead)
 def update_tool(tool_id: int, tool_update: ToolUpdate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
@@ -273,7 +336,7 @@ def update_tool(tool_id: int, tool_update: ToolUpdate, session: Session = Depend
         )
     session.commit()
     
-    return db_tool
+    return populate_exact_matches([db_tool], session)[0]
 
 @router.delete("/{tool_id}")
 def delete_tool(tool_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
@@ -369,7 +432,7 @@ def read_tool_by_qr(qr_code: str, session: Session = Depends(get_session)):
     tool = session.exec(statement).first()
     if not tool:
         raise HTTPException(status_code=404, detail="Tool not found")
-    return tool
+    return populate_exact_matches([tool], session)[0]
 
 @router.get("/public/site/{site}", response_model=List[ToolRead])
 def read_public_tools_by_site(site: str, session: Session = Depends(get_session)):
@@ -377,7 +440,7 @@ def read_public_tools_by_site(site: str, session: Session = Depends(get_session)
     from sqlalchemy import func
     query = query.where(func.lower(func.trim(Tool.current_site)) == site.strip().lower())
     tools = session.exec(query).all()
-    return tools
+    return populate_exact_matches(tools, session)
 
 @router.get("/public/batch/{qr_code}", response_model=List[ToolRead])
 def read_public_batch_tools(qr_code: str, session: Session = Depends(get_session)):
@@ -388,7 +451,7 @@ def read_public_batch_tools(qr_code: str, session: Session = Depends(get_session
         
     created_at = tool.created_at
     if not created_at:
-        return [tool]
+        return populate_exact_matches([tool], session)
         
     from datetime import timedelta
     start_time = created_at - timedelta(seconds=10)
@@ -396,5 +459,5 @@ def read_public_batch_tools(qr_code: str, session: Session = Depends(get_session
     
     query = select(Tool).where(Tool.created_at >= start_time, Tool.created_at <= end_time)
     tools = session.exec(query).all()
-    return tools
+    return populate_exact_matches(tools, session)
 
