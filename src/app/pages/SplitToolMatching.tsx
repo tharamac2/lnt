@@ -69,29 +69,91 @@ const SplitToolMatching = () => {
         setPartBDesc(tool.description);
         setPartBStatus(tool.status || 'usable');
 
-        // Compare Logic - Comprehensive Check
-        const matchDesc = partADetails.description.toLowerCase() === tool.description.toLowerCase();
-        const matchMake = (partADetails.make || '').toLowerCase() === (tool.make || '').toLowerCase();
-        const matchCapacity = (partADetails.capacity || '').toLowerCase() === (tool.capacity || '').toLowerCase();
-        const matchSwl = (partADetails.safe_working_load || '').toLowerCase() === (tool.safe_working_load || '').toLowerCase();
-        const matchLocation = (partADetails.current_site || '').toLowerCase() === (tool.current_site || '').toLowerCase();
+        // Check if either part is a Derrick Pole
+        const isDerrickPole = (desc: string) => {
+          const d = (desc || '').toLowerCase().trim();
+          return (d.includes('derrick') && d.includes('pole')) || (d.includes('dirreck') && d.includes('pole'));
+        };
 
-        // Match Check - Strict on Name and Location (User Request)
-        // Others (Make, Capacity, SWL) are implicitly expected to match if name matches, but we won't fail the scan on them.
+        const isDerrickA = isDerrickPole(partADetails.description);
+        const isDerrickB = isDerrickPole(tool.description);
 
-        const isMatch = matchDesc && matchLocation;
-
-        if (!isMatch) {
-          setResult('mismatch');
-        } else {
-          // Details match, check status
-          const isAMatchStatus = partAStatus === 'usable';
-          const isBMatchStatus = (tool.status || 'usable') === 'usable';
-
-          if (isAMatchStatus && isBMatchStatus) {
-            setResult('match');
+        if (isDerrickA || isDerrickB) {
+          if (isDerrickA !== isDerrickB) {
+            // One is a Derrick Pole and the other is not
+            setResult('mismatch');
           } else {
-            setResult('mixed_status');
+            // Both are Derrick Poles
+            const matchLocation = (partADetails.current_site || '').toLowerCase() === (tool.current_site || '').toLowerCase();
+            if (!matchLocation) {
+              setResult('mismatch');
+            } else {
+              try {
+                // Fetch all tools at this site to find the total N of Derrick Poles
+                const siteToolsRes = await api.get(`/tools/?site=${partADetails.current_site}`);
+                const siteTools = siteToolsRes.data;
+
+                // Filter for Derrick Poles
+                const derrickPoles = siteTools.filter((t: any) => isDerrickPole(t.description));
+
+                // Extract sequence number suffix from QR code
+                const getQrSuffix = (qr: string) => {
+                  const match = qr.match(/\d+$/);
+                  return match ? parseInt(match[0], 10) : 0;
+                };
+
+                // Sort ascending by sequence suffix
+                derrickPoles.sort((x: any, y: any) => getQrSuffix(x.qr_code) - getQrSuffix(y.qr_code));
+
+                // Find 0-based indexes in the sorted list
+                const idxA = derrickPoles.findIndex((t: any) => t.qr_code === partA);
+                const idxB = derrickPoles.findIndex((t: any) => t.qr_code === tool.qr_code);
+
+                if (idxA === -1 || idxB === -1) {
+                  setResult('mismatch');
+                } else {
+                  const N = derrickPoles.length;
+                  const half = Math.floor(N / 2);
+                  const isPairMatch = Math.abs(idxA - idxB) === half && half > 0;
+
+                  if (!isPairMatch) {
+                    setResult('mismatch');
+                  } else {
+                    // Match found, check usability status
+                    const isAMatchStatus = partAStatus === 'usable';
+                    const isBMatchStatus = (tool.status || 'usable') === 'usable';
+
+                    if (isAMatchStatus && isBMatchStatus) {
+                      setResult('match');
+                    } else {
+                      setResult('mixed_status');
+                    }
+                  }
+                }
+              } catch (err) {
+                console.error("Error verifying Derrick Pole pairs", err);
+                toast.error("Failed to verify Derrick Pole pairs against database");
+                setResult('mismatch');
+              }
+            }
+          }
+        } else {
+          // Default matching logic for non-Derrick Pole tools
+          const matchDesc = partADetails.description.toLowerCase() === tool.description.toLowerCase();
+          const matchLocation = (partADetails.current_site || '').toLowerCase() === (tool.current_site || '').toLowerCase();
+          const isMatch = matchDesc && matchLocation;
+
+          if (!isMatch) {
+            setResult('mismatch');
+          } else {
+            const isAMatchStatus = partAStatus === 'usable';
+            const isBMatchStatus = (tool.status || 'usable') === 'usable';
+
+            if (isAMatchStatus && isBMatchStatus) {
+              setResult('match');
+            } else {
+              setResult('mixed_status');
+            }
           }
         }
       }
