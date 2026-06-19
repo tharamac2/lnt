@@ -21,14 +21,6 @@ const SplitToolMatching = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeScan, setActiveScan] = useState<'A' | 'B' | null>(null);
 
-  const handleMismatch = () => {
-    toast.error("Mismatch detected! Redirecting to login page...");
-    sessionStorage.removeItem('token');
-    setTimeout(() => {
-      window.location.href = '/';
-    }, 1000);
-  };
-
   const triggerCamera = (part: 'A' | 'B') => {
     setActiveScan(part);
     fileInputRef.current?.click();
@@ -89,12 +81,12 @@ const SplitToolMatching = () => {
         if (isDerrickA || isDerrickB) {
           if (isDerrickA !== isDerrickB) {
             // One is a Derrick Pole and the other is not
-            handleMismatch();
+            setResult('mismatch');
           } else {
             // Both are Derrick Poles
             const matchLocation = (partADetails.current_site || '').toLowerCase() === (tool.current_site || '').toLowerCase();
             if (!matchLocation) {
-              handleMismatch();
+              setResult('mismatch');
             } else {
               try {
                 // Fetch all tools at this site to find the total N of Derrick Poles
@@ -118,14 +110,14 @@ const SplitToolMatching = () => {
                 const idxB = derrickPoles.findIndex((t: any) => t.qr_code === tool.qr_code);
 
                 if (idxA === -1 || idxB === -1) {
-                  handleMismatch();
+                  setResult('mismatch');
                 } else {
                   const N = derrickPoles.length;
                   const half = Math.floor(N / 2);
                   const isPairMatch = Math.abs(idxA - idxB) === half && half > 0;
 
                   if (!isPairMatch) {
-                    handleMismatch();
+                    setResult('mismatch');
                   } else {
                     // Match found, check usability status
                     const isAMatchStatus = partAStatus === 'usable';
@@ -134,13 +126,13 @@ const SplitToolMatching = () => {
                     if (isAMatchStatus && isBMatchStatus) {
                       setResult('match');
                     } else {
-                      handleMismatch();
+                      setResult('mismatch');
                     }
                   }
                 }
               } catch (err) {
                 console.error("Error verifying Derrick Pole pairs", err);
-                handleMismatch();
+                setResult('mismatch');
               }
             }
           }
@@ -151,7 +143,7 @@ const SplitToolMatching = () => {
           const isMatch = matchDesc && matchLocation;
 
           if (!isMatch) {
-            handleMismatch();
+            setResult('mismatch');
           } else {
             const isAMatchStatus = partAStatus === 'usable';
             const isBMatchStatus = (tool.status || 'usable') === 'usable';
@@ -159,7 +151,7 @@ const SplitToolMatching = () => {
             if (isAMatchStatus && isBMatchStatus) {
               setResult('match');
             } else {
-              handleMismatch();
+              setResult('mismatch');
             }
           }
         }
@@ -183,23 +175,30 @@ const SplitToolMatching = () => {
     setActiveScan(null);
   };
 
-  if (result === 'match') {
+  if (result) {
+    const isMatch = result === 'match';
     return (
       <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center p-4">
         {/* Hidden div for scanner */}
         <div id="reader-hidden-split" className="hidden"></div>
 
         <div
-          className="max-w-2xl w-full rounded-2xl p-12 text-center space-y-8 bg-[#16A34A]"
+          className={`max-w-2xl w-full rounded-2xl p-12 text-center space-y-8 ${
+            isMatch ? 'bg-[#16A34A]' : 'bg-[#DC2626]'
+          }`}
         >
-          <CheckCircle className="w-32 h-32 text-white mx-auto animate-bounce" />
+          {isMatch ? (
+            <CheckCircle className="w-32 h-32 text-white mx-auto animate-bounce" />
+          ) : (
+            <XCircle className="w-32 h-32 text-white mx-auto animate-pulse" />
+          )}
 
           <div className="text-white space-y-4">
             <h1 className="text-5xl font-bold">
-              SAFE TO USE
+              {isMatch ? 'SAFE TO USE' : 'MISMATCH'}
             </h1>
             <p className="text-2xl opacity-90">
-              Tool is in good condition
+              {isMatch ? 'Tool is in good condition' : 'Tool is not matchable'}
             </p>
           </div>
 
