@@ -90,7 +90,7 @@ const SplitToolMatching = () => {
             } else {
               try {
                 // Fetch all tools at this site to find the total N of Derrick Poles
-                const siteToolsRes = await api.get(`/tools/?site=${partADetails.current_site}`);
+                const siteToolsRes = await api.get(`/tools/public/site/${partADetails.current_site}`);
                 const siteTools = siteToolsRes.data;
 
                 // Filter for Derrick Poles

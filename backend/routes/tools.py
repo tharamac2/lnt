@@ -370,3 +370,11 @@ def read_tool_by_qr(qr_code: str, session: Session = Depends(get_session)):
     if not tool:
         raise HTTPException(status_code=404, detail="Tool not found")
     return tool
+
+@router.get("/public/site/{site}", response_model=List[ToolRead])
+def read_public_tools_by_site(site: str, session: Session = Depends(get_session)):
+    query = select(Tool).where(Tool.is_deleted == False)
+    from sqlalchemy import func
+    query = query.where(func.lower(func.trim(Tool.current_site)) == site.strip().lower())
+    tools = session.exec(query).all()
+    return tools
