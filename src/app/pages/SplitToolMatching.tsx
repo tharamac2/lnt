@@ -21,6 +21,14 @@ const SplitToolMatching = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeScan, setActiveScan] = useState<'A' | 'B' | null>(null);
 
+  const handleMismatch = () => {
+    toast.error("Mismatch detected! Redirecting to login page...");
+    sessionStorage.removeItem('token');
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 1000);
+  };
+
   const triggerCamera = (part: 'A' | 'B') => {
     setActiveScan(part);
     fileInputRef.current?.click();
@@ -81,12 +89,12 @@ const SplitToolMatching = () => {
         if (isDerrickA || isDerrickB) {
           if (isDerrickA !== isDerrickB) {
             // One is a Derrick Pole and the other is not
-            setResult('mismatch');
+            handleMismatch();
           } else {
             // Both are Derrick Poles
             const matchLocation = (partADetails.current_site || '').toLowerCase() === (tool.current_site || '').toLowerCase();
             if (!matchLocation) {
-              setResult('mismatch');
+              handleMismatch();
             } else {
               try {
                 // Fetch all tools at this site to find the total N of Derrick Poles
@@ -110,14 +118,14 @@ const SplitToolMatching = () => {
                 const idxB = derrickPoles.findIndex((t: any) => t.qr_code === tool.qr_code);
 
                 if (idxA === -1 || idxB === -1) {
-                  setResult('mismatch');
+                  handleMismatch();
                 } else {
                   const N = derrickPoles.length;
                   const half = Math.floor(N / 2);
                   const isPairMatch = Math.abs(idxA - idxB) === half && half > 0;
 
                   if (!isPairMatch) {
-                    setResult('mismatch');
+                    handleMismatch();
                   } else {
                     // Match found, check usability status
                     const isAMatchStatus = partAStatus === 'usable';
@@ -126,14 +134,13 @@ const SplitToolMatching = () => {
                     if (isAMatchStatus && isBMatchStatus) {
                       setResult('match');
                     } else {
-                      setResult('mixed_status');
+                      handleMismatch();
                     }
                   }
                 }
               } catch (err) {
                 console.error("Error verifying Derrick Pole pairs", err);
-                toast.error("Failed to verify Derrick Pole pairs against database");
-                setResult('mismatch');
+                handleMismatch();
               }
             }
           }
@@ -144,7 +151,7 @@ const SplitToolMatching = () => {
           const isMatch = matchDesc && matchLocation;
 
           if (!isMatch) {
-            setResult('mismatch');
+            handleMismatch();
           } else {
             const isAMatchStatus = partAStatus === 'usable';
             const isBMatchStatus = (tool.status || 'usable') === 'usable';
@@ -152,7 +159,7 @@ const SplitToolMatching = () => {
             if (isAMatchStatus && isBMatchStatus) {
               setResult('match');
             } else {
-              setResult('mixed_status');
+              handleMismatch();
             }
           }
         }
@@ -176,98 +183,24 @@ const SplitToolMatching = () => {
     setActiveScan(null);
   };
 
-  if (result) {
-    const isMatch = result === 'match';
-    const isMixed = result === 'mixed_status';
-
-    let bgColor = 'bg-[#DC2626]'; // Default red
-    if (isMatch) bgColor = 'bg-[#16A34A]';
-    if (isMixed) bgColor = 'bg-[#CA8A04]'; // Yellow/Orange for mixed
-
+  if (result === 'match') {
     return (
       <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center p-4">
         {/* Hidden div for scanner */}
         <div id="reader-hidden-split" className="hidden"></div>
 
         <div
-          className={`max-w-2xl w-full rounded-2xl p-12 text-center space-y-8 ${bgColor}`}
+          className="max-w-2xl w-full rounded-2xl p-12 text-center space-y-8 bg-[#16A34A]"
         >
-          {isMatch ? (
-            <CheckCircle className="w-32 h-32 text-white mx-auto animate-bounce" />
-          ) : isMixed ? (
-            <div className="relative w-32 h-32 mx-auto">
-              <XCircle className="w-32 h-32 text-white animate-pulse" />
-            </div>
-          ) : (
-            <XCircle className="w-32 h-32 text-white mx-auto animate-pulse" />
-          )}
+          <CheckCircle className="w-32 h-32 text-white mx-auto animate-bounce" />
 
           <div className="text-white space-y-4">
-            <h1 className="text-4xl font-bold">
-              {isMatch ? 'CORRECT COMBINATION' : isMixed ? 'PARTS MATCHED (STATUS ISSUE)' : 'WRONG COMBINATION'}
+            <h1 className="text-5xl font-bold">
+              SAFE TO USE
             </h1>
             <p className="text-2xl opacity-90">
-              {isMatch ? 'Safe to use - Parts matched successfully'
-                : isMixed ? 'Tools are compatible type/location but Status Mismatch'
-                  : 'Do not use - Parts do not match'}
+              Tool is in good condition
             </p>
-          </div>
-
-          <div className="bg-white bg-opacity-20 backdrop-blur-sm rounded-xl p-8 space-y-6">
-            <div className="grid grid-cols-2 gap-6 text-white text-left">
-              <div className={`p-4 rounded-lg bg-white/10 border ${partAStatus !== 'usable' ? 'border-red-400 bg-red-900/20' : 'border-green-400 bg-green-900/20'}`}>
-                <div className="flex justify-between items-start mb-2">
-                  <p className="text-sm opacity-75 font-semibold">Part A</p>
-                  <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${partAStatus === 'usable' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
-                    {partAStatus}
-                  </span>
-                </div>
-                <p className="font-medium text-xl capitalize mb-1">{partADetails?.description}</p>
-                <div className="text-sm opacity-80 mb-2">
-                  <p>Location: <span className="font-medium">{partADetails?.current_site || 'Unknown'}</span></p>
-                </div>
-                <p className="font-mono text-xs opacity-60">{partA}</p>
-              </div>
-
-              <div className={`p-4 rounded-lg bg-white/10 border ${partBStatus !== 'usable' ? 'border-red-400 bg-red-900/20' : 'border-green-400 bg-green-900/20'}`}>
-                <div className="flex justify-between items-start mb-2">
-                  <p className="text-sm opacity-75 font-semibold">Part B</p>
-                  <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${partBStatus === 'usable' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
-                    {partBStatus}
-                  </span>
-                </div>
-                <p className="font-medium text-xl capitalize mb-1">{partBDesc}</p>
-                {/* Note: tool object for Part B is local variable in handleScan, assume it matches partADetails location if matched, but we don't have full object in state except description. But logic says location must match for 'match' or 'mixed'. */}
-                <div className="text-sm opacity-80 mb-2">
-                  <p>Location: <span className="font-medium">{partADetails?.current_site || 'Unknown'}</span></p>
-                </div>
-                <p className="font-mono text-xs opacity-60">{partB}</p>
-              </div>
-            </div>
-
-            {isMixed && (
-              <div className="border-t border-white border-opacity-30 pt-6">
-                <div className="text-white text-center space-y-2">
-                  <p className="text-xl font-bold">Action Required</p>
-                  <p className="text-lg">
-                    Use <span className="font-bold underline">{partAStatus === 'usable' ? 'Part A' : 'Part B'}</span> only.
-                  </p>
-                  <p className="text-base opacity-90">
-                    Discard {partAStatus !== 'usable' ? 'Part A' : 'Part B'} ({partAStatus !== 'usable' ? partA : partB}) immediately.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {!isMatch && !isMixed && (
-              <div className="border-t border-white border-opacity-30 pt-6">
-                <div className="text-white text-center space-y-2">
-                  <p className="text-xl font-medium">Mismatch Reason</p>
-                  <p className="text-lg opacity-90">Parts are different tools</p>
-                  <p className="text-base opacity-75">{partADetails?.description} vs {partBDesc}</p>
-                </div>
-              </div>
-            )}
           </div>
 
           <Button
@@ -276,7 +209,7 @@ const SplitToolMatching = () => {
             className="text-lg px-12 py-6"
             onClick={reset}
           >
-            Check Another Set
+            Scan Another Tool
           </Button>
         </div>
       </div>
