@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../services/api';
+import { User } from '../App';
+
 
 interface Dealer {
   id: number;
@@ -81,7 +83,11 @@ interface CustomFieldDef {
   options: string | null;
 }
 
-const DealersPage = () => {
+interface DealersPageProps {
+  user?: User;
+}
+
+const DealersPage = ({ user }: DealersPageProps) => {
   const [dealers, setDealers] = useState<Dealer[]>([]);
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDef[]>([]);
   const [loading, setLoading] = useState(true);
@@ -335,7 +341,7 @@ const DealersPage = () => {
           <Truck className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <p className="font-medium text-gray-700">No {categoryName} found</p>
           <p className="text-sm text-gray-400 mt-1">
-            {searchQuery ? 'Try matching another search query' : `Register your first ${categoryName} manually or via Excel.`}
+            {searchQuery ? 'Try matching another search query' : `Register your first ${categoryName} manually${user?.role === 'admin' ? ' or via Excel.' : '.'}`}
           </p>
         </div>
       );
@@ -535,28 +541,30 @@ const DealersPage = () => {
             Add Dealers
           </h1>
           <p className="text-gray-500 mt-1">
-            Manage your project sub-contractors, tool suppliers, and scrap dealers. Add them manually or import via Excel templates.
+            Manage your project sub-contractors, tool suppliers, and scrap dealers. {user?.role === 'admin' ? 'Add them manually or import via Excel templates.' : 'Add them manually.'}
           </p>
         </div>
 
         {/* Bulk Import Button */}
-        <div className="flex items-center gap-2">
-          <Input
-            id="import-excel-dealers"
-            type="file"
-            accept=".xlsx, .xls"
-            onChange={handleFileImport}
-            className="hidden"
-            disabled={isImporting}
-          />
-          <Label
-            htmlFor="import-excel-dealers"
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg cursor-pointer transition-colors duration-200"
-          >
-            <FileSpreadsheet className="w-5 h-5" />
-            {isImporting ? 'Importing...' : 'Bulk Import Excel'}
-          </Label>
-        </div>
+        {user?.role === 'admin' && (
+          <div className="flex items-center gap-2">
+            <Input
+              id="import-excel-dealers"
+              type="file"
+              accept=".xlsx, .xls"
+              onChange={handleFileImport}
+              className="hidden"
+              disabled={isImporting}
+            />
+            <Label
+              htmlFor="import-excel-dealers"
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg cursor-pointer transition-colors duration-200"
+            >
+              <FileSpreadsheet className="w-5 h-5" />
+              {isImporting ? 'Importing...' : 'Bulk Import Excel'}
+            </Label>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

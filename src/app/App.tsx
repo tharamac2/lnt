@@ -126,7 +126,7 @@ function App() {
               <Route path="/inspection-employees" element={<InspectionEmployees />} />
               <Route path="/tool-config" element={<ToolConfigPage />} />
               <Route path="/tool-history" element={<ToolHistoryPage />} />
-              <Route path="/dealers" element={<DealersPage />} />
+              <Route path="/dealers" element={<DealersPage user={user} />} />
               <Route path="/settings" element={<SettingsPage />} />
             </>
           )}
@@ -140,7 +140,7 @@ function App() {
               <Route path="/tools-movements" element={<ToolsMovements />} />
               <Route path="/tools-movement-history" element={<ToolsMovementHistory />} />
               <Route path="/inspection-employees" element={<InspectionEmployees />} />
-              <Route path="/dealers" element={<DealersPage />} />
+              <Route path="/dealers" element={<DealersPage user={user} />} />
             </>
           )}
 
