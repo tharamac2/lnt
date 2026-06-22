@@ -1090,6 +1090,9 @@ const ToolMaster = ({ user }: { user?: User }) => {
             <p className="text-sm text-gray-500">
               Upload an Excel (.xlsx, .xls) or PDF file containing your tool details. The file must have a table with columns such as Description, Make, Capacity, SWL, etc.
             </p>
+            <p className="text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-md p-2.5">
+              💡 <strong>Custom Fields Auto-Mapping:</strong> Any custom fields you have configured {customFieldDefs.length > 0 && `(such as: ${customFieldDefs.slice(0, 3).map(f => f.name).join(', ')})`} will be automatically imported and saved if you add their exact names as additional columns in your Excel sheet.
+            </p>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center bg-gray-50">
               <UploadCloud className="h-10 w-10 text-gray-400 mb-2" />
               <Label htmlFor="bulk-file-upload" className="cursor-pointer text-sm font-medium text-blue-600 hover:text-blue-500">

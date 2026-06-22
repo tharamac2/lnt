@@ -1,6 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 import shutil
 import os
+import json
 import uuid
 import io
 import re
@@ -12,7 +13,7 @@ import zipfile
 from PIL import Image, ImageDraw, ImageFont
 from sqlmodel import Session, select
 from ..database import get_session
-from ..models import Tool, User, Alert, ToolConfig
+from ..models import Tool, User, Alert, ToolConfig, ToolCustomField
 from ..auth import get_current_user
 router = APIRouter(prefix="/upload", tags=["upload"])
 
@@ -162,6 +163,9 @@ async def upload_tools(
             max_id = max(max_id, int(t.qr_code[-4:]))
     successfully_imported_tools = []
     
+    # Fetch all custom field definitions to map from Excel
+    custom_field_defs = session.exec(select(ToolCustomField)).all()
+    
     qr_links = []
     frontend_url = os.environ.get('FRONTEND_URL', 'https://localhost:5173').rstrip('/')
     frontend_url = 'https://lntqrcode.com/'
@@ -253,6 +257,24 @@ async def upload_tools(
                     }
                     item_code = FALLBACK_TOOL_CODE_MAPPING.get(description)
 
+            # Parse custom fields from excel row
+            custom_vals = {}
+            for fdef in custom_field_defs:
+                # Find matching column
+                f_name_norm = fdef.name.strip().lower().replace(' ', '_')
+                matched_val = None
+                for col in df.columns:
+                    if col == f_name_norm or col.replace('_', ' ') == fdef.name.lower():
+                        matched_val = row.get(col)
+                        break
+                if matched_val is not None:
+                    # Clean and format value
+                    matched_val = str(matched_val).strip()
+                    if matched_val and matched_val.lower() != 'none' and matched_val.lower() != 'nan':
+                        custom_vals[fdef.name] = matched_val
+
+            custom_fields_str = json.dumps(custom_vals) if custom_vals else None
+
             db_tool = Tool(
                 description=description,
                 make=make,
@@ -273,7 +295,8 @@ async def upload_tools(
                 validity_period=validation_period,
                 qr_code=qr_code,
                 status="usable",
-                inspection_result="usable"
+                inspection_result="usable",
+                custom_fields=custom_fields_str
             )
             session.add(db_tool)
             successfully_imported_tools.append(db_tool)
