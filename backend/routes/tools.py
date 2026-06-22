@@ -2,11 +2,129 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
 from sqlmodel import Session, select
 from ..database import get_session
-from ..models import Tool, ToolCreate, ToolRead, ToolUpdate, User
+from ..models import Tool, ToolCreate, ToolRead, ToolUpdate, User, ToolCustomField, ToolCustomFieldCreate, ToolCustomFieldRead, ToolCustomFieldUpdate
 from ..auth import get_current_user
 from ..audit import log_action
 
 router = APIRouter(prefix="/tools", tags=["tools"])
+
+# --- Tool Custom Fields Management Endpoints ---
+
+@router.get("/custom-fields", response_model=List[ToolCustomFieldRead])
+def read_tool_custom_fields(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    stmt = select(ToolCustomField).order_by(ToolCustomField.name.asc())
+    return session.exec(stmt).all()
+
+@router.post("/custom-fields", response_model=ToolCustomFieldRead)
+def create_tool_custom_field(
+    payload: ToolCustomFieldCreate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can manage tool custom fields")
+    
+    payload.name = payload.name.strip()
+    if not payload.name:
+        raise HTTPException(status_code=400, detail="Field name cannot be empty")
+        
+    if payload.field_type not in ("text", "number", "file", "radio", "checkbox", "checkboxes"):
+        raise HTTPException(status_code=400, detail="Invalid field type. Choose text, number, file, radio, checkbox, or checkboxes.")
+
+    # Check unique name (case-insensitive)
+    stmt = select(ToolCustomField)
+    existing_fields = session.exec(stmt).all()
+    if any(f.name.lower() == payload.name.lower() for f in existing_fields):
+        raise HTTPException(status_code=400, detail="Custom field name already exists")
+
+    db_field = ToolCustomField.from_orm(payload)
+    session.add(db_field)
+    session.commit()
+    session.refresh(db_field)
+
+    log_action(
+        session, current_user, "create", "ToolCustomField", db_field.id,
+        f"Created tool custom field definition '{db_field.name}' ({db_field.field_type})",
+        site=current_user.site,
+    )
+    session.commit()
+    return db_field
+
+@router.put("/custom-fields/{field_id}", response_model=ToolCustomFieldRead)
+def update_tool_custom_field(
+    field_id: int,
+    payload: ToolCustomFieldUpdate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can manage tool custom fields")
+
+    db_field = session.get(ToolCustomField, field_id)
+    if not db_field:
+        raise HTTPException(status_code=404, detail="Custom field not found")
+
+    update_data = payload.dict(exclude_unset=True)
+    if "name" in update_data:
+        name = update_data["name"].strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Field name cannot be empty")
+        # Check unique if name changed
+        if name.lower() != db_field.name.lower():
+            stmt = select(ToolCustomField)
+            existing_fields = session.exec(stmt).all()
+            if any(f.name.lower() == name.lower() for f in existing_fields):
+                raise HTTPException(status_code=400, detail="Custom field name already exists")
+        db_field.name = name
+
+    if "field_type" in update_data:
+        field_type = update_data["field_type"]
+        if field_type not in ("text", "number", "file", "radio", "checkbox", "checkboxes"):
+            raise HTTPException(status_code=400, detail="Invalid field type")
+        db_field.field_type = field_type
+
+    if "is_required" in update_data:
+        db_field.is_required = update_data["is_required"]
+
+    if "options" in update_data:
+        db_field.options = update_data["options"]
+
+    session.add(db_field)
+    session.commit()
+    session.refresh(db_field)
+
+    log_action(
+        session, current_user, "update", "ToolCustomField", db_field.id,
+        f"Updated tool custom field definition '{db_field.name}'",
+        site=current_user.site,
+    )
+    session.commit()
+    return db_field
+
+@router.delete("/custom-fields/{field_id}")
+def delete_tool_custom_field(
+    field_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can manage tool custom fields")
+
+    db_field = session.get(ToolCustomField, field_id)
+    if not db_field:
+        raise HTTPException(status_code=404, detail="Custom field not found")
+
+    log_action(
+        session, current_user, "delete", "ToolCustomField", field_id,
+        f"Deleted tool custom field definition '{db_field.name}'",
+        site=current_user.site,
+    )
+    session.delete(db_field)
+    session.commit()
+    return {"ok": True}
 
 def populate_exact_matches(tools: List[Tool], session: Session) -> List[ToolRead]:
     tool_reads = []

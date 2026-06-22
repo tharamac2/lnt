@@ -92,6 +92,7 @@ class ToolBase(SQLModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     is_printed: bool = Field(default=False)
     is_deleted: bool = Field(default=False)
+    custom_fields: Optional[str] = None
 
 class Tool(ToolBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -132,6 +133,7 @@ class ToolUpdate(SQLModel):
     validity_period: Optional[int] = None
     date_of_supply: Optional[datetime] = None
     debit_to: Optional[str] = None
+    custom_fields: Optional[str] = None
 
 class InspectionBase(SQLModel):
     tool_id: int = Field(foreign_key="tool.id")
@@ -311,3 +313,24 @@ class DealerCustomFieldUpdate(SQLModel):
     is_required: Optional[bool] = None
     options: Optional[str] = None
 
+
+class ToolCustomFieldBase(SQLModel):
+    name: str = Field(index=True, unique=True)
+    field_type: str  # text, number, file, radio, checkbox, checkboxes
+    is_required: bool = Field(default=False)
+    options: Optional[str] = None  # Comma-separated options for radio or checkboxes field type
+
+class ToolCustomField(ToolCustomFieldBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+class ToolCustomFieldCreate(ToolCustomFieldBase):
+    pass
+
+class ToolCustomFieldRead(ToolCustomFieldBase):
+    id: int
+
+class ToolCustomFieldUpdate(SQLModel):
+    name: Optional[str] = None
+    field_type: Optional[str] = None
+    is_required: Optional[bool] = None
+    options: Optional[str] = None

@@ -187,6 +187,49 @@ const ViewTool = () => {
                             <p className="text-gray-500">Supplier Contact</p>
                             <p className="font-medium">{tool.purchaser_contact || '-'}</p>
                         </div>
+
+                        {tool.custom_fields && (() => {
+                            let customFieldsObj: Record<string, any> = {};
+                            try {
+                                customFieldsObj = JSON.parse(tool.custom_fields);
+                            } catch (e) {
+                                console.error('Failed to parse custom fields JSON', e);
+                            }
+                            
+                            if (Object.keys(customFieldsObj).length === 0) return null;
+                            
+                            return (
+                                <div className="col-span-2 border-t pt-4 space-y-2 mt-2">
+                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Additional Information</p>
+                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                        {Object.entries(customFieldsObj).map(([key, val]) => {
+                                            const isFile = typeof val === 'string' && val.startsWith('/api/uploads/');
+                                            return (
+                                                <div key={key} className="col-span-2 flex justify-between items-center bg-gray-50/50 p-2 rounded border border-gray-200">
+                                                    <span className="text-gray-500 font-medium">{key}</span>
+                                                    {isFile ? (
+                                                        <a
+                                                            href={val}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="text-blue-600 hover:underline font-semibold"
+                                                        >
+                                                            View Document
+                                                        </a>
+                                                    ) : typeof val === 'boolean' ? (
+                                                        <span className="font-semibold text-gray-700">{val ? 'Yes' : 'No'}</span>
+                                                    ) : Array.isArray(val) ? (
+                                                        <span className="font-semibold text-gray-700">{val.join(', ')}</span>
+                                                    ) : (
+                                                        <span className="font-semibold text-gray-700">{String(val)}</span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </CardContent>
             </Card>

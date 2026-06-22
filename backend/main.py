@@ -42,6 +42,16 @@ def on_startup():
             print("Migration: Successfully updated misspelled site names to TIRUNELVELI.")
         except Exception as e:
             print(f"Migration error updating site names: {e}")
+        try:
+            conn.execute(text("SELECT custom_fields FROM tool LIMIT 1"))
+        except Exception:
+            try:
+                # SQLite ALTER TABLE support
+                conn.execute(text("ALTER TABLE tool ADD COLUMN custom_fields TEXT"))
+                conn.commit()
+                print("Migration: Successfully added 'custom_fields' column to 'tool' table.")
+            except Exception as e:
+                print(f"Migration error adding 'custom_fields' column to 'tool' table: {e}")
 
         try:
             conn.execute(text("SELECT custom_fields FROM dealer LIMIT 1"))

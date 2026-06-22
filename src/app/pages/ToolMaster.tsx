@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Separator } from '../components/ui/separator';
 import { QRCodeCanvas } from 'qrcode.react';
-import { Download, Printer, Save, Edit, Search, FileDown, History, UploadCloud, X, Activity, Trash2, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
+import { Download, Printer, Save, Edit, Search, FileDown, History, UploadCloud, X, Activity, Trash2, FileSpreadsheet, CheckCircle2, Upload, Plus } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import {
@@ -156,6 +156,20 @@ const ToolMaster = ({ user }: { user?: User }) => {
     }
   }, [user]);
 
+  // Fetch tool custom fields templates on mount
+  const fetchCustomFieldDefs = async () => {
+    try {
+      const response = await api.get('/tools/custom-fields');
+      setCustomFieldDefs(response.data);
+    } catch (error) {
+      console.error('Failed to fetch custom field definitions', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchCustomFieldDefs();
+  }, []);
+
   const [toolData, setToolData] = useState({
     description: '',
     make: new Date().getFullYear().toString(),
@@ -190,6 +204,87 @@ const ToolMaster = ({ user }: { user?: User }) => {
   const [editingToolId, setEditingToolId] = useState<number | null>(null);
   const [scanning, setScanning] = useState(false);
   const [isToolSaved, setIsToolSaved] = useState(false);
+
+  // Dynamic Custom Fields State
+  const [customFieldDefs, setCustomFieldDefs] = useState<any[]>([]);
+  const [customValues, setCustomValues] = useState<Record<string, any>>({});
+  const [showFieldBuilder, setShowFieldBuilder] = useState(false);
+  const [newFieldName, setNewFieldName] = useState('');
+  const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'file' | 'radio' | 'checkbox' | 'checkboxes'>('text');
+  const [newFieldRequired, setNewFieldRequired] = useState(false);
+  const [newFieldOptions, setNewFieldOptions] = useState('');
+  const [savingField, setSavingField] = useState(false);
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
+
+  const handleCreateCustomField = async () => {
+    if (!newFieldName.trim()) {
+      toast.error('Field name is required');
+      return;
+    }
+    const isMultiOption = newFieldType === 'radio' || newFieldType === 'checkboxes';
+    if (isMultiOption && !newFieldOptions.trim()) {
+      toast.error(`Options are required for ${newFieldType} fields`);
+      return;
+    }
+    setSavingField(true);
+    try {
+      await api.post('/tools/custom-fields', {
+        name: newFieldName.trim(),
+        field_type: newFieldType,
+        is_required: newFieldRequired,
+        options: isMultiOption ? newFieldOptions.trim() : null
+      });
+      toast.success('Custom field template added successfully');
+      setNewFieldName('');
+      setNewFieldRequired(false);
+      setNewFieldOptions('');
+      setShowFieldBuilder(false);
+      fetchCustomFieldDefs();
+    } catch (error: any) {
+      console.error(error);
+      const detail = error.response?.data?.detail || 'Failed to add custom field';
+      toast.error(detail);
+    } finally {
+      setSavingField(false);
+    }
+  };
+
+  const handleDeleteCustomField = async (id: number, fieldName: string) => {
+    if (!window.confirm(`Are you sure you want to delete the custom field template "${fieldName}"?\nThis won't delete data already stored on existing tools, but the field will no longer appear in the registration form.`)) {
+      return;
+    }
+    try {
+      await api.delete(`/tools/custom-fields/${id}`);
+      toast.success('Custom field template deleted successfully.');
+      fetchCustomFieldDefs();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to delete custom field template');
+    }
+  };
+
+  const handleCustomFileUpload = async (fieldName: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    setUploadingField(fieldName);
+    try {
+      const response = await api.post('/upload/certificate', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setCustomValues(prev => ({
+        ...prev,
+        [fieldName]: response.data.url
+      }));
+      toast.success(`${fieldName} uploaded successfully`);
+    } catch (error) {
+      console.error('Failed to upload file', error);
+      toast.error(`Failed to upload ${fieldName}`);
+    } finally {
+      setUploadingField(null);
+    }
+  };
 
   // History State
   const [historyTool, setHistoryTool] = useState<any>(null); // The tool currently being viewed
@@ -554,6 +649,16 @@ const ToolMaster = ({ user }: { user?: User }) => {
         return;
       }
 
+      // Validate required custom fields
+      for (const fdef of customFieldDefs) {
+        if (fdef.is_required && (!customValues[fdef.name] || !customValues[fdef.name].toString().trim())) {
+          toast.error(`Custom field "${fdef.name}" is required`);
+          return;
+        }
+      }
+
+      const payloadCustomFields = Object.keys(customValues).length > 0 ? JSON.stringify(customValues) : null;
+
       const payload = {
         ...toolData,
         metal_type: toolData.metalType,
@@ -577,7 +682,8 @@ const ToolMaster = ({ user }: { user?: User }) => {
         qr_code: qrCode, // Use the auto-generated ID
         expiry_date: formatDateForApi(toolData.expiryDate),
         job_code: toolData.jobCode,
-        job_description: toolData.jobDescription
+        job_description: toolData.jobDescription,
+        custom_fields: payloadCustomFields
       };
 
 
@@ -772,6 +878,17 @@ const ToolMaster = ({ user }: { user?: User }) => {
   const handleEditTool = (tool: any) => {
     setEditingToolId(tool.id);
     setQrCode(tool.qr_code);
+
+    let customVals = {};
+    if (tool.custom_fields) {
+      try {
+        customVals = JSON.parse(tool.custom_fields);
+      } catch (e) {
+        console.error('Failed to parse custom fields JSON', e);
+      }
+    }
+    setCustomValues(customVals);
+
     setToolData({
       description: tool.description,
       make: tool.make,
@@ -820,6 +937,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
     setQrCode('');
     setIsToolSaved(false);
     setErrors({});
+    setCustomValues({});
     setToolData(prev => ({
       ...prev,
       description: '',
@@ -1319,9 +1437,264 @@ const ToolMaster = ({ user }: { user?: User }) => {
                 </CardContent>
               </Card>
 
+              {/* Custom Fields Card */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-lg font-semibold">Additional Information (Custom Fields)</CardTitle>
+                  {user?.role === 'admin' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowFieldBuilder(!showFieldBuilder)}
+                      className="text-xs h-8 border-indigo-200 text-indigo-600 hover:bg-indigo-50 flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      {showFieldBuilder ? 'Close Field Builder' : 'Manage Custom Fields'}
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-6 pt-4">
+                  {/* Field Builder Form (Admin Only) */}
+                  {user?.role === 'admin' && showFieldBuilder && (
+                    <div className="bg-slate-55 p-4 rounded-lg border border-slate-200 space-y-3 mb-4">
+                      <div className="space-y-1">
+                        <Label htmlFor="customFieldName" className="text-xs font-semibold text-slate-600">Field Name</Label>
+                        <Input
+                          id="customFieldName"
+                          placeholder="e.g. Warranty Certificate"
+                          value={newFieldName}
+                          onChange={(e) => setNewFieldName(e.target.value)}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label htmlFor="customFieldType" className="text-xs font-semibold text-slate-600">Type</Label>
+                          <select
+                            id="customFieldType"
+                            value={newFieldType}
+                            onChange={(e) => setNewFieldType(e.target.value as any)}
+                            className="w-full h-8 px-2 bg-white border border-slate-200 rounded text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                          >
+                            <option value="text">Alphabet / Text</option>
+                            <option value="number">Numeric</option>
+                            <option value="file">File / Image Upload</option>
+                            <option value="radio">Radio Buttons (Single Select)</option>
+                            <option value="checkbox">Checkbox (Toggle)</option>
+                            <option value="checkboxes">Checkboxes (Multiple Select)</option>
+                          </select>
+                        </div>
+                        <div className="flex items-center space-x-2 pt-6">
+                          <input
+                            type="checkbox"
+                            id="customFieldRequired"
+                            checked={newFieldRequired}
+                            onChange={(e) => setNewFieldRequired(e.target.checked)}
+                            className="rounded border-slate-350 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                          />
+                          <Label htmlFor="customFieldRequired" className="text-xs font-semibold text-slate-600 select-none cursor-pointer">
+                            Required
+                          </Label>
+                        </div>
+                      </div>
+                      
+                      {(newFieldType === 'radio' || newFieldType === 'checkboxes') && (
+                        <div className="space-y-1">
+                          <Label htmlFor="customFieldOptions" className="text-xs font-semibold text-slate-600">
+                            Options (comma-separated) <span className="text-red-500">*</span>
+                          </Label>
+                          <Input
+                            id="customFieldOptions"
+                            placeholder="e.g. Option A, Option B, Option C"
+                            value={newFieldOptions}
+                            onChange={(e) => setNewFieldOptions(e.target.value)}
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                      )}
 
+                      <Button
+                        type="button"
+                        onClick={handleCreateCustomField}
+                        disabled={savingField}
+                        className="w-full h-8 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded transition-colors"
+                      >
+                        {savingField ? 'Adding Field...' : 'Save Field Template'}
+                      </Button>
+                    </div>
+                  )}
 
+                  {/* Render Configured Field Templates badges (Admin Only) */}
+                  {user?.role === 'admin' && customFieldDefs.length > 0 && (
+                    <div className="space-y-1.5 border-b pb-4 mb-4">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Configured Fields List</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {customFieldDefs.map((fdef) => (
+                          <span
+                            key={fdef.id}
+                            className="inline-flex items-center gap-1 bg-white border border-slate-200 pl-2.5 pr-1.5 py-1 rounded-md text-[11px] font-medium text-slate-600 shadow-2xs"
+                          >
+                            <span>{fdef.name}</span>
+                            <span className="text-[9px] text-indigo-500 font-mono">({fdef.field_type})</span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCustomField(fdef.id, fdef.name)}
+                              className="text-slate-400 hover:text-red-650 transition-colors ml-1 font-bold text-xs"
+                              title="Delete Field Template"
+                            >
+                              &times;
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
+                  {/* Dynamic Inputs Renderer based on templates */}
+                  {customFieldDefs.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {customFieldDefs.map((fdef) => {
+                        const val = customValues[fdef.name];
+                        const isRequired = fdef.is_required;
+                        
+                        return (
+                          <div key={fdef.id} className="space-y-2">
+                            <Label className="text-sm font-medium text-gray-700">
+                              {fdef.name} {isRequired && <span className="text-red-500">*</span>}
+                            </Label>
+                            
+                            {fdef.field_type === 'text' && (
+                              <Input
+                                type="text"
+                                placeholder={`Enter ${fdef.name}`}
+                                value={val || ''}
+                                onChange={(e) => setCustomValues(prev => ({ ...prev, [fdef.name]: e.target.value }))}
+                                required={isRequired}
+                              />
+                            )}
+
+                            {fdef.field_type === 'number' && (
+                              <Input
+                                type="number"
+                                placeholder={`Enter number for ${fdef.name}`}
+                                value={val || ''}
+                                onChange={(e) => setCustomValues(prev => ({ ...prev, [fdef.name]: e.target.value }))}
+                                required={isRequired}
+                              />
+                            )}
+
+                            {fdef.field_type === 'checkbox' && (
+                              <div className="flex items-center space-x-2 pt-2">
+                                <input
+                                  type="checkbox"
+                                  id={`chk-${fdef.id}`}
+                                  checked={!!val}
+                                  onChange={(e) => setCustomValues(prev => ({ ...prev, [fdef.name]: e.target.checked }))}
+                                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                                />
+                                <Label htmlFor={`chk-${fdef.id}`} className="text-sm text-gray-600 font-medium select-none cursor-pointer">
+                                  Yes / Checked
+                                </Label>
+                              </div>
+                            )}
+
+                            {fdef.field_type === 'file' && (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="file"
+                                  accept=".pdf, .jpg, .jpeg, .png"
+                                  id={`file-${fdef.id}`}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleCustomFileUpload(fdef.name, file);
+                                  }}
+                                  className="hidden"
+                                />
+                                <Label
+                                  htmlFor={`file-${fdef.id}`}
+                                  className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold py-2 px-4 rounded-md cursor-pointer border border-indigo-200 transition-colors text-xs"
+                                >
+                                  <Upload className="w-4 h-4" />
+                                  {uploadingField === fdef.name ? 'Uploading...' : 'Choose File'}
+                                </Label>
+                                {val && (
+                                  <div className="flex items-center gap-1.5 max-w-[150px] truncate">
+                                    <span className="text-xs text-green-700 font-medium truncate" title={val.split('/').pop()}>
+                                      {val.split('/').pop()}
+                                    </span>
+                                    <a href={val} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-800 text-xs font-semibold shrink-0">
+                                      [View]
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {fdef.field_type === 'radio' && fdef.options && (
+                              <div className="flex flex-wrap gap-4 pt-2">
+                                {fdef.options.split(',').map((opt) => {
+                                  const trimmed = opt.trim();
+                                  return (
+                                    <div key={trimmed} className="flex items-center space-x-2">
+                                      <input
+                                        type="radio"
+                                        id={`radio-${fdef.id}-${trimmed}`}
+                                        name={`radio-${fdef.id}`}
+                                        checked={val === trimmed}
+                                        onChange={() => setCustomValues(prev => ({ ...prev, [fdef.name]: trimmed }))}
+                                        className="text-indigo-600 focus:ring-indigo-500 h-4 w-4 border-gray-300"
+                                      />
+                                      <Label htmlFor={`radio-${fdef.id}-${trimmed}`} className="text-sm text-gray-600 select-none cursor-pointer">
+                                        {trimmed}
+                                      </Label>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {fdef.field_type === 'checkboxes' && fdef.options && (
+                              <div className="flex flex-wrap gap-4 pt-2">
+                                {fdef.options.split(',').map((opt) => {
+                                  const trimmed = opt.trim();
+                                  const currentArr = Array.isArray(val) ? val : [];
+                                  const isChecked = currentArr.includes(trimmed);
+                                  
+                                  return (
+                                    <div key={trimmed} className="flex items-center space-x-2">
+                                      <input
+                                        type="checkbox"
+                                        id={`cb-${fdef.id}-${trimmed}`}
+                                        checked={isChecked}
+                                        onChange={(e) => {
+                                          let nextArr;
+                                          if (e.target.checked) {
+                                            nextArr = [...currentArr, trimmed];
+                                          } else {
+                                            nextArr = currentArr.filter(item => item !== trimmed);
+                                          }
+                                          setCustomValues(prev => ({ ...prev, [fdef.name]: nextArr }));
+                                        }}
+                                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                                      />
+                                      <Label htmlFor={`cb-${fdef.id}-${trimmed}`} className="text-sm text-gray-600 select-none cursor-pointer">
+                                        {trimmed}
+                                      </Label>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400 italic">No custom fields have been defined for tools yet.</p>
+                  )}
+                </CardContent>
+              </Card>
 
               <Button className="w-full bg-[#1E3A8A] h-12 text-lg" onClick={handleSave}>
                 <Save className="mr-2 h-5 w-5" />
@@ -1742,6 +2115,51 @@ const ToolMaster = ({ user }: { user?: User }) => {
                   </div>
                 )}
               </div>
+
+              {/* Tool Custom Fields in Spotlight Card */}
+              {hoveredTool.custom_fields && (() => {
+                let customFieldsObj: Record<string, any> = {};
+                try {
+                  customFieldsObj = JSON.parse(hoveredTool.custom_fields);
+                } catch (e) {
+                  console.error('Failed to parse custom fields JSON', e);
+                }
+                
+                if (Object.keys(customFieldsObj).length === 0) return null;
+                
+                return (
+                  <div className="pt-2 border-t mt-2">
+                    <span className="text-gray-500 font-semibold block text-xs mb-1.5">Additional Parameters</span>
+                    <div className="grid grid-cols-1 gap-2 max-h-[150px] overflow-y-auto pr-1">
+                      {Object.entries(customFieldsObj).map(([key, val]) => {
+                        const isFile = typeof val === 'string' && val.startsWith('/api/uploads/');
+                        return (
+                          <div key={key} className="flex justify-between items-center text-xs bg-gray-50 p-1.5 rounded border border-gray-150">
+                            <span className="text-gray-500 font-medium truncate max-w-[120px]">{key}:</span>
+                            {isFile ? (
+                              <a
+                                href={val}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-blue-600 hover:underline font-semibold"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                View File
+                              </a>
+                            ) : typeof val === 'boolean' ? (
+                              <span className="font-semibold text-gray-700">{val ? 'Yes' : 'No'}</span>
+                            ) : Array.isArray(val) ? (
+                              <span className="font-semibold text-gray-700 truncate max-w-[150px]" title={val.join(', ')}>{val.join(', ')}</span>
+                            ) : (
+                              <span className="font-semibold text-gray-700 truncate max-w-[150px]" title={String(val)}>{String(val)}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {(hoveredTool.remarks || hoveredTool.test_certificate) && (
                 <div className="pt-2 text-xs space-y-2 border-t mt-2">
