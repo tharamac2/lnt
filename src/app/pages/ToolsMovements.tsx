@@ -6,7 +6,7 @@ import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
-import { ArrowDownCircle, ArrowUpCircle, History, Save, Truck, X } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, History, Save, Truck, X, Upload } from 'lucide-react';
 import api from '../services/api';
 import { toast } from 'sonner';
 import { generateDeliveryChallanPDF } from '../utils/deliveryChallan';
@@ -34,8 +34,32 @@ const ToolsMovements = () => {
   // Dealer Custom Fields State
   const [dealerCustomFields, setDealerCustomFields] = useState<any[]>([]);
   const [selectedCustomFields, setSelectedCustomFields] = useState<any[]>([]);
-  const [customFieldStates, setCustomFieldStates] = useState<{ [key: string]: boolean }>({});
+  const [customFieldValues, setCustomFieldValues] = useState<{ [key: string]: any }>({});
   const [showCustomFieldsSelector, setShowCustomFieldsSelector] = useState(false);
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
+
+  const handleCustomFileUpload = async (fieldName: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    setUploadingField(fieldName);
+    try {
+      const response = await api.post('/upload/certificate', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setCustomFieldValues(prev => ({
+        ...prev,
+        [fieldName]: response.data.url
+      }));
+      toast.success(`${fieldName} uploaded successfully`);
+    } catch (error) {
+      console.error('Failed to upload file', error);
+      toast.error(`Failed to upload ${fieldName}`);
+    } finally {
+      setUploadingField(null);
+    }
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -126,7 +150,7 @@ const ToolsMovements = () => {
     setBulkFormData({ subcontractorName: '', subcontractorCode: '', subcontractorMobile: '', targetSite: '', remarks: '' });
     setBulkMobileError('');
     setSelectedCustomFields([]);
-    setCustomFieldStates({});
+    setCustomFieldValues({});
     setShowCustomFieldsSelector(false);
   };
 
@@ -169,9 +193,20 @@ const ToolsMovements = () => {
 
       let checklistStr = '';
       if (selectedCustomFields.length > 0) {
-        const items = selectedCustomFields.map(
-          (field) => `${field.name}: ${customFieldStates[field.name] ? 'Enabled' : 'Disabled'}`
-        );
+        const items = selectedCustomFields.map((field) => {
+          const val = customFieldValues[field.name];
+          let displayVal = '';
+          if (val === undefined || val === null || val === '') {
+            displayVal = 'Not Provided';
+          } else if (typeof val === 'boolean') {
+            displayVal = val ? 'Yes' : 'No';
+          } else if (Array.isArray(val)) {
+            displayVal = `[${val.join(', ')}]`;
+          } else {
+            displayVal = typeof val === 'string' && val.startsWith('/') ? val.split('/').pop() || val : String(val);
+          }
+          return `${field.name}: ${displayVal}`;
+        });
         checklistStr = ` [Checklist: ${items.join(', ')}]`;
       }
 
@@ -475,7 +510,10 @@ const ToolsMovements = () => {
                                 className="w-full text-left px-2 py-1.5 hover:bg-gray-100 rounded text-sm text-gray-700 block transition-colors"
                                 onClick={() => {
                                   setSelectedCustomFields([...selectedCustomFields, field]);
-                                  setCustomFieldStates({ ...customFieldStates, [field.name]: false });
+                                  let initialVal: any = '';
+                                  if (field.field_type === 'checkbox') initialVal = false;
+                                  if (field.field_type === 'checkboxes') initialVal = [];
+                                  setCustomFieldValues(prev => ({ ...prev, [field.name]: initialVal }));
                                   setShowCustomFieldsSelector(false);
                                 }}
                               >
@@ -495,47 +533,161 @@ const ToolsMovements = () => {
 
                 {selectedCustomFields.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg border border-dashed">
-                    {selectedCustomFields.map((field) => (
-                      <div key={field.id} className="flex items-center justify-between bg-white p-2.5 rounded border shadow-sm">
-                        <div className="flex items-center space-x-3">
-                          <input
-                            type="checkbox"
-                            id={`custom-toggle-${field.id}`}
-                            checked={customFieldStates[field.name] || false}
-                            onChange={(e) => {
-                              setCustomFieldStates({
-                                ...customFieldStates,
-                                [field.name]: e.target.checked
-                              });
-                            }}
-                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                          />
-                          <Label
-                            htmlFor={`custom-toggle-${field.id}`}
-                            className="text-sm font-medium text-gray-700 cursor-pointer select-none"
-                          >
-                            {field.name}
-                            <span className="ml-2 text-xs text-gray-400 font-normal">
-                              ({customFieldStates[field.name] ? 'Enabled' : 'Disabled'})
-                            </span>
-                          </Label>
+                    {selectedCustomFields.map((field) => {
+                      const val = customFieldValues[field.name];
+                      return (
+                        <div key={field.id} className="flex flex-col bg-white p-3 rounded border shadow-sm space-y-2 relative">
+                          <div className="flex items-center justify-between border-b pb-1.5">
+                            <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                              {field.name}
+                              <span className="text-[9px] text-slate-400 font-mono lowercase">({field.field_type})</span>
+                            </Label>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-gray-400 hover:text-red-500 hover:bg-red-50"
+                              onClick={() => {
+                                setSelectedCustomFields(selectedCustomFields.filter(f => f.id !== field.id));
+                                setCustomFieldValues(prev => {
+                                  const copy = { ...prev };
+                                  delete copy[field.name];
+                                  return copy;
+                                });
+                              }}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+
+                          <div className="pt-1">
+                            {field.field_type === 'text' && (
+                              <Input
+                                placeholder={`Enter ${field.name}`}
+                                value={val || ''}
+                                onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [field.name]: e.target.value }))}
+                                className="h-9 text-xs"
+                              />
+                            )}
+
+                            {field.field_type === 'number' && (
+                              <Input
+                                type="number"
+                                placeholder={`Enter ${field.name}`}
+                                value={val || ''}
+                                onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [field.name]: e.target.value }))}
+                                className="h-9 text-xs"
+                              />
+                            )}
+
+                            {field.field_type === 'checkbox' && (
+                              <div className="flex items-center space-x-2 pt-1">
+                                <input
+                                  type="checkbox"
+                                  id={`custom-toggle-${field.id}`}
+                                  checked={!!val}
+                                  onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [field.name]: e.target.checked }))}
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+                                />
+                                <Label
+                                  htmlFor={`custom-toggle-${field.id}`}
+                                  className="text-xs text-slate-500 select-none cursor-pointer"
+                                >
+                                  Toggle Yes / No ({val ? 'Yes' : 'No'})
+                                </Label>
+                              </div>
+                            )}
+
+                            {field.field_type === 'radio' && (
+                              <div className="flex flex-wrap gap-4 pt-1">
+                                {(field.options || '').split(',').map((o) => o.trim()).filter(Boolean).map((opt) => (
+                                  <label key={opt} className="flex items-center space-x-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                                    <input
+                                      type="radio"
+                                      name={`custom-radio-${field.id}`}
+                                      value={opt}
+                                      checked={val === opt}
+                                      onChange={() => setCustomFieldValues(prev => ({ ...prev, [field.name]: opt }))}
+                                      className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                                    />
+                                    <span>{opt}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+
+                            {field.field_type === 'checkboxes' && (
+                              <div className="flex flex-wrap gap-4 pt-1">
+                                {(field.options || '').split(',').map((o) => o.trim()).filter(Boolean).map((opt) => {
+                                  const currentArray = Array.isArray(val) ? val : [];
+                                  const isChecked = currentArray.includes(opt);
+                                  return (
+                                    <label key={opt} className="flex items-center space-x-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={() => {
+                                          let nextArray;
+                                          if (isChecked) {
+                                            nextArray = currentArray.filter((item: string) => item !== opt);
+                                          } else {
+                                            nextArray = [...currentArray, opt];
+                                          }
+                                          setCustomFieldValues(prev => ({ ...prev, [field.name]: nextArray }));
+                                        }}
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+                                      />
+                                      <span>{opt}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {field.field_type === 'file' && (
+                              <div className="space-y-1.5 w-full">
+                                {val ? (
+                                  <div className="flex items-center justify-between bg-blue-50 border border-blue-150 p-2 rounded-lg text-xs">
+                                    <span className="font-semibold text-blue-750 truncate max-w-[180px]">
+                                      {val.split('/').pop()}
+                                    </span>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setCustomFieldValues(prev => {
+                                        const copy = { ...prev };
+                                        delete copy[field.name];
+                                        return copy;
+                                      })}
+                                      className="h-6 px-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 text-[10px]"
+                                    >
+                                      Clear
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      id={`custom-file-${field.id}`}
+                                      type="file"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) handleCustomFileUpload(field.name, file);
+                                      }}
+                                      disabled={uploadingField === field.name}
+                                      className="text-xs h-9 cursor-pointer"
+                                    />
+                                    {uploadingField === field.name && (
+                                      <span className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full shrink-0"></span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-gray-400 hover:text-red-500 hover:bg-red-50"
-                          onClick={() => {
-                            setSelectedCustomFields(selectedCustomFields.filter(f => f.id !== field.id));
-                            const updatedStates = { ...customFieldStates };
-                            delete updatedStates[field.name];
-                            setCustomFieldStates(updatedStates);
-                          }}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center p-4 bg-gray-50 rounded-lg border border-dashed text-sm text-gray-400">
