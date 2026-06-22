@@ -428,8 +428,13 @@ def restore_tool(tool_id: int, session: Session = Depends(get_session), current_
 
 @router.get("/qr/{qr_code}", response_model=ToolRead)
 def read_tool_by_qr(qr_code: str, session: Session = Depends(get_session)):
-    statement = select(Tool).where(Tool.qr_code == qr_code)
-    tool = session.exec(statement).first()
+    if qr_code.isdigit() and len(qr_code) == 4:
+        statement = select(Tool).where(Tool.qr_code.like(f"%{qr_code}")).where(Tool.is_deleted == False)
+        tool = session.exec(statement).first()
+    else:
+        statement = select(Tool).where(Tool.qr_code == qr_code)
+        tool = session.exec(statement).first()
+        
     if not tool:
         raise HTTPException(status_code=404, detail="Tool not found")
     return populate_exact_matches([tool], session)[0]
