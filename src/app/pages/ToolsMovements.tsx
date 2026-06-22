@@ -130,11 +130,28 @@ const ToolsMovements = () => {
       return;
     }
 
+    let toolsToProcess = [...bulkTools];
+    if (bulkActionMode === 'out') {
+      if (bulkOutSubCategory === 'subcon_work' || bulkOutSubCategory === 'site_transfer') {
+        toolsToProcess = bulkTools.filter((t) => t.status === 'usable');
+        if (toolsToProcess.length === 0) {
+          toast.error("No eligible working tools (usable) found in selection for this transfer.");
+          return;
+        }
+      } else if (bulkOutSubCategory === 'scrap_disposal') {
+        toolsToProcess = bulkTools.filter((t) => t.status === 'scrap' || t.status === 'scrapped');
+        if (toolsToProcess.length === 0) {
+          toast.error("No eligible scrap tools found in selection for scrap disposal.");
+          return;
+        }
+      }
+    }
+
     setBulkSubmitting(true);
     try {
       const updatedTools: any[] = [];
 
-      for (const tool of bulkTools) {
+      for (const tool of toolsToProcess) {
         const payload: any = { previous_site: tool.current_site };
 
         if (bulkActionMode === 'in') {
@@ -181,7 +198,7 @@ const ToolsMovements = () => {
         updatedTools.push({ ...tool, ...payload });
       }
 
-      toast.success(`Bulk ${bulkActionMode === 'in' ? 'Receipt' : 'Dispatch'} recorded for ${bulkTools.length} item(s)`);
+      toast.success(`Bulk ${bulkActionMode === 'in' ? 'Receipt' : 'Dispatch'} recorded for ${toolsToProcess.length} item(s)`);
 
       const transactionDetails = bulkActionMode === 'in' ? bulkInSubCategory : bulkOutSubCategory;
       const pdfType = bulkActionMode === 'in' ? 'RECEIPT' : 'DISPATCH';
@@ -286,26 +303,26 @@ const ToolsMovements = () => {
               <div className="space-y-4 animate-in slide-in-from-right-2">
                 <Label>Dispatch Type</Label>
                 <RadioGroup value={bulkOutSubCategory} onValueChange={setBulkOutSubCategory} className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <div className={`flex items-center space-x-2 border p-3 rounded-md cursor-pointer ${anySelectedScrap ? 'opacity-50 bg-gray-100 cursor-not-allowed' : 'hover:bg-gray-50'}`}>
-                    <RadioGroupItem value="subcon_work" id="bd1" disabled={anySelectedScrap} />
-                    <Label htmlFor="bd1" className={`cursor-pointer ${anySelectedScrap ? 'cursor-not-allowed text-gray-400' : ''}`}>Issue to Sub-Contractor</Label>
+                  <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-gray-50">
+                    <RadioGroupItem value="subcon_work" id="bd1" />
+                    <Label htmlFor="bd1" className="cursor-pointer">Issue to Sub-Contractor</Label>
                   </div>
-                  <div className={`flex items-center space-x-2 border p-3 rounded-md cursor-pointer ${anySelectedScrap ? 'opacity-50 bg-gray-100 cursor-not-allowed' : 'hover:bg-gray-50'}`}>
-                    <RadioGroupItem value="site_transfer" id="bd2" disabled={anySelectedScrap} />
-                    <Label htmlFor="bd2" className={`cursor-pointer ${anySelectedScrap ? 'cursor-not-allowed text-gray-400' : ''}`}>Transfer to Next Site</Label>
+                  <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-gray-50">
+                    <RadioGroupItem value="site_transfer" id="bd2" />
+                    <Label htmlFor="bd2" className="cursor-pointer">Transfer to Next Site</Label>
                   </div>
-                  <div className={`flex items-center space-x-2 border p-3 rounded-md cursor-pointer ${!allSelectedScrap ? 'opacity-50 bg-gray-100 cursor-not-allowed' : 'hover:bg-red-50 border-red-200'}`}>
-                    <RadioGroupItem value="scrap_disposal" id="bd3" disabled={!allSelectedScrap} />
-                    <Label htmlFor="bd3" className={`cursor-pointer ${!allSelectedScrap ? 'cursor-not-allowed text-gray-400' : 'text-red-700'}`}>Issue to Scrap Dealer</Label>
+                  <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-red-50 border-red-200">
+                    <RadioGroupItem value="scrap_disposal" id="bd3" />
+                    <Label htmlFor="bd3" className="cursor-pointer text-red-700">Issue to Scrap Dealer</Label>
                   </div>
                 </RadioGroup>
 
-                {anySelectedScrap && (
-                  <p className="text-xs text-gray-500">Issue to Sub-Contractor / Transfer are disabled because one or more selected tools are marked Scrap.</p>
-                )}
-                {!allSelectedScrap && (
-                  <p className="text-xs text-gray-500">Issue to Scrap Dealer is only available when every selected tool is already marked Scrap.</p>
-                )}
+                <p className="text-xs text-gray-500">
+                  * Note: Dispatches to Sub-Contractor / Site will automatically filter and only transfer <strong>usable (working condition)</strong> tools.
+                </p>
+                <p className="text-xs text-red-600">
+                  * Note: Dispatches to Scrap Dealer will automatically filter and only transfer <strong>scrap</strong> tools.
+                </p>
               </div>
             )}
 

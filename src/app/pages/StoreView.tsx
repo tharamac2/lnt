@@ -195,6 +195,21 @@ const StoreView = () => {
   const handleSubmit = async () => {
     if (!scannedTool) return;
 
+    // Tool Status Validation
+    if (transactionType === 'out') {
+      if (outSubCategory === 'subcon_work' || outSubCategory === 'site_transfer') {
+        if (scannedTool.status !== 'usable') {
+          toast.error("Only tools in working condition (usable) can be issued to a subcontractor or transferred to another site.");
+          return;
+        }
+      } else if (outSubCategory === 'scrap_disposal') {
+        if (scannedTool.status !== 'scrap' && scannedTool.status !== 'scrapped') {
+          toast.error("Only scrap tools can be sent to a scrap dealer.");
+          return;
+        }
+      }
+    }
+
     // Mobile Validation
     if ((transactionType === 'out' && outSubCategory === 'subcon_work') ||
       (transactionType === 'out' && outSubCategory === 'scrap_disposal')) {
@@ -537,17 +552,17 @@ const StoreView = () => {
                     <div className="space-y-4 animate-in slide-in-from-right-2">
                       <Label>Dispatch Type</Label>
                       <RadioGroup value={outSubCategory} onValueChange={setOutSubCategory} className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                        <div className={`flex items-center space-x-2 border p-3 rounded-md cursor-pointer ${scannedTool.status === 'scrap' || scannedTool.status === 'scrapped' ? 'opacity-50 bg-gray-100 cursor-not-allowed' : 'hover:bg-gray-50'}`}>
-                          <RadioGroupItem value="subcon_work" id="d1" disabled={scannedTool.status === 'scrap' || scannedTool.status === 'scrapped'} />
-                          <Label htmlFor="d1" className={`cursor-pointer ${scannedTool.status === 'scrap' || scannedTool.status === 'scrapped' ? 'cursor-not-allowed text-gray-400' : ''}`}>Issue to Sub-Contractor</Label>
+                        <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-gray-50">
+                          <RadioGroupItem value="subcon_work" id="d1" />
+                          <Label htmlFor="d1" className="cursor-pointer">Issue to Sub-Contractor</Label>
                         </div>
-                        <div className={`flex items-center space-x-2 border p-3 rounded-md cursor-pointer ${scannedTool.status === 'scrap' || scannedTool.status === 'scrapped' ? 'opacity-50 bg-gray-100 cursor-not-allowed' : 'hover:bg-gray-50'}`}>
-                          <RadioGroupItem value="site_transfer" id="d2" disabled={scannedTool.status === 'scrap' || scannedTool.status === 'scrapped'} />
-                          <Label htmlFor="d2" className={`cursor-pointer ${scannedTool.status === 'scrap' || scannedTool.status === 'scrapped' ? 'cursor-not-allowed text-gray-400' : ''}`}>Transfer to Next Site</Label>
+                        <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-gray-50">
+                          <RadioGroupItem value="site_transfer" id="d2" />
+                          <Label htmlFor="d2" className="cursor-pointer">Transfer to Next Site</Label>
                         </div>
-                        <div className={`flex items-center space-x-2 border p-3 rounded-md cursor-pointer ${scannedTool.status !== 'scrap' && scannedTool.status !== 'scrapped' ? 'opacity-50 bg-gray-100 cursor-not-allowed' : 'hover:bg-red-50 border-red-200'}`}>
-                          <RadioGroupItem value="scrap_disposal" id="d3" disabled={scannedTool.status !== 'scrap' && scannedTool.status !== 'scrapped'} />
-                          <Label htmlFor="d3" className={`cursor-pointer ${scannedTool.status !== 'scrap' && scannedTool.status !== 'scrapped' ? 'cursor-not-allowed text-gray-400' : 'text-red-700'}`}>Issue to Scrap Dealer</Label>
+                        <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-red-50 border-red-200">
+                          <RadioGroupItem value="scrap_disposal" id="d3" />
+                          <Label htmlFor="d3" className="cursor-pointer text-red-700">Issue to Scrap Dealer</Label>
                         </div>
                       </RadioGroup>
                     </div>
