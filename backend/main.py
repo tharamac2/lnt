@@ -95,6 +95,26 @@ def on_startup():
             except Exception as e:
                 print(f"Migration error adding 'status' column: {e}")
 
+        try:
+            conn.execute(text("SELECT pending_return_date FROM tool LIMIT 1"))
+        except Exception:
+            try:
+                conn.execute(text("ALTER TABLE tool ADD COLUMN pending_return_date DATETIME"))
+                conn.commit()
+                print("Migration: Successfully added 'pending_return_date' column to 'tool' table.")
+            except Exception as e:
+                print(f"Migration error adding 'pending_return_date' column: {e}")
+
+        try:
+            conn.execute(text("SELECT pending_reason FROM tool LIMIT 1"))
+        except Exception:
+            try:
+                conn.execute(text("ALTER TABLE tool ADD COLUMN pending_reason TEXT"))
+                conn.commit()
+                print("Migration: Successfully added 'pending_reason' column to 'tool' table.")
+            except Exception as e:
+                print(f"Migration error adding 'pending_reason' column: {e}")
+
 # Mount uploads directory to serve files
 app.mount("/api/uploads", StaticFiles(directory="uploads"), name="uploads")
 
