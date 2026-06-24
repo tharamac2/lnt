@@ -53,6 +53,8 @@ const emptyFields: EditableFields = {
   freightPaid: '',
   receiptRmnNo: '',
   receiptDate: '',
+  driverName: '',
+  driverMobile: '',
 };
 
 const DeliveryChallanPreviewDialog = ({
@@ -102,6 +104,8 @@ const DeliveryChallanPreviewDialog = ({
         freightPaid: initialOptions.freightPaid || '',
         receiptRmnNo: initialOptions.receiptRmnNo || '',
         receiptDate: initialOptions.receiptDate || '',
+        driverName: initialOptions.driverName || '',
+        driverMobile: initialOptions.driverMobile || '',
       });
       setItems(initialOptions.items.map((item) => ({ ...item })));
       setCopyDistribution(
@@ -371,6 +375,14 @@ const DeliveryChallanPreviewDialog = ({
                 <div className="space-y-1.5">
                   <Label className="text-xs">Receipt Date</Label>
                   <Input value={fields.receiptDate} onChange={(e) => setField('receiptDate', e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Driver Name</Label>
+                  <Input value={fields.driverName} onChange={(e) => setField('driverName', e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Driver Mobile Number</Label>
+                  <Input value={fields.driverMobile} onChange={(e) => setField('driverMobile', e.target.value)} />
                 </div>
               </div>
               <p className="text-xs text-gray-400">Signature of receiver is filled in manually after printing.</p>

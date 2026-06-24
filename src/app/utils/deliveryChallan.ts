@@ -36,6 +36,8 @@ export interface DeliveryChallanOptions {
   freightPaid?: string;
   receiptRmnNo?: string;
   receiptDate?: string;
+  driverName?: string;
+  driverMobile?: string;
   copyDistribution?: string[];
 }
 
@@ -63,6 +65,7 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
     dcNo, trnCd, sendingCentreCode, mrNo, mrDate, stockType, vendorCode, ewayBillNo,
     gatePassApprovedBy, totalAmount, consignorSalesTax, consigneeSalesTax,
     vehicleDetails, lrNo, freightToPay, freightPaid, receiptRmnNo, receiptDate,
+    driverName, driverMobile,
     copyDistribution,
   } = options;
   const doc = new jsPDF();
@@ -275,21 +278,29 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   // --- Receipt Details / For L&T ---
   const recHeight = 28;
   doc.rect(left, y, width, recHeight);
-  doc.line(left + width / 2, y, left + width / 2, y + recHeight);
-  doc.setFont('helvetica', 'bold');
-  doc.text('RECEIPT DETAILS', left + 2, y + 6);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  if (receiptRmnNo) doc.text(receiptRmnNo, left + 2, y + recHeight - 9);
-  if (receiptDate) doc.text(receiptDate, left + 35, y + recHeight - 9);
-  doc.setFontSize(7);
-  doc.text('(RMN NO.)', left + 2, y + recHeight - 3);
-  doc.text('(DATE)', left + 35, y + recHeight - 3);
-  doc.text('(SIGNATURE OF RECEIVER)', left + 58, y + recHeight - 3, { maxWidth: width / 2 - 60 });
-
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text('FOR LARSEN & TOUBRO LIMITED CONSTRUCTION DIVISION', left + width / 2 + 2, y + 6, { maxWidth: width / 2 - 4 });
+  doc.text('RECEIPT DETAILS', left + 2, y + 6);
+  doc.text('FOR LARSEN & TOUBRO LIMITED CONSTRUCTION DIVISION', right - 2, y + 6, { align: 'right', maxWidth: width / 2 });
+  doc.line(left, y + 10, right, y + 10);
+
+  // Single-line columns: RMN No. | Date | Driver Name | Mobile No. | Signature of Receiver
+  const recCols = [
+    { label: '(RMN NO.)', value: receiptRmnNo, x: left + 2, w: 26 },
+    { label: '(DATE)', value: receiptDate, x: left + 30, w: 22 },
+    { label: '(DRIVER NAME)', value: driverName, x: left + 54, w: 40 },
+    { label: '(MOBILE NO.)', value: driverMobile, x: left + 96, w: 34 },
+    { label: '(SIGNATURE OF RECEIVER)', value: '', x: left + 132, w: width - 132 - 2 },
+  ];
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  recCols.forEach((col) => {
+    if (col.value) doc.text(String(col.value), col.x, y + recHeight - 9, { maxWidth: col.w - 2 });
+  });
+  doc.setFontSize(6.5);
+  recCols.forEach((col) => {
+    doc.text(col.label, col.x, y + recHeight - 3, { maxWidth: col.w - 2 });
+  });
   y += recHeight;
 
   // --- Remarks Box ---
