@@ -66,6 +66,7 @@ const DeliveryChallanPreviewDialog = ({
   // Copy Distribution checkboxes are always shown unchecked in the generated PDF
   const copyDistribution: string[] = [];
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
   const setField = (key: keyof EditableFields, value: string) => {
@@ -108,6 +109,7 @@ const DeliveryChallanPreviewDialog = ({
     if (!open || !initialOptions) return;
 
     let revoked = false;
+    setPreviewLoading(true);
     const timer = setTimeout(() => {
       buildDeliveryChallanDoc({
         ...initialOptions,
@@ -123,8 +125,11 @@ const DeliveryChallanPreviewDialog = ({
             return blobUrl;
           });
         })
-        .catch((err) => console.error('Failed to build challan preview', err));
-    }, 400);
+        .catch((err) => {
+          console.error('Failed to build challan preview', err);
+          setPreviewLoading(false);
+        });
+    }, 600);
 
     return () => {
       revoked = true;
@@ -134,9 +139,10 @@ const DeliveryChallanPreviewDialog = ({
   }, [open, initialOptions, fields, items, copyDistribution]);
 
   useEffect(() => {
-    if (!open && previewUrl) {
-      URL.revokeObjectURL(previewUrl);
+    if (!open) {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
+      setPreviewLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -382,11 +388,17 @@ const DeliveryChallanPreviewDialog = ({
             </div>
           </div>
 
-          <div className="border rounded-md overflow-hidden bg-gray-50 min-h-[400px]">
-            {previewUrl ? (
-              <iframe title="Delivery Challan Preview" src={previewUrl} className="w-full h-full min-h-[400px]" />
-            ) : (
-              <div className="flex items-center justify-center h-full min-h-[400px] text-sm text-gray-400">
+          <div className="relative border rounded-md overflow-hidden bg-gray-50 min-h-[400px]">
+            {previewUrl && (
+              <iframe
+                title="Delivery Challan Preview"
+                src={previewUrl}
+                className="w-full h-full min-h-[400px]"
+                onLoad={() => setPreviewLoading(false)}
+              />
+            )}
+            {(previewLoading || !previewUrl) && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-50 text-sm text-gray-400">
                 Generating preview...
               </div>
             )}
