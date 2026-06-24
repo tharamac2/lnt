@@ -184,28 +184,17 @@ def populate_exact_matches(tools: List[Tool], session: Session) -> List[ToolRead
             N = len(subgroup)
             half = N // 2
             if N >= 2 and half > 0:
-                part_a_tools = subgroup[:half]
-                part_b_tools = subgroup[half:]
+                part_a_suffixes = [get_qr_suffix(t.qr_code) for t in subgroup[:half]]
+                part_b_suffixes = [get_qr_suffix(t.qr_code) for t in subgroup[half:]]
                 
-                part_a_suffixes = [get_qr_suffix(t.qr_code) for t in part_a_tools]
-                part_b_suffixes = [get_qr_suffix(t.qr_code) for t in part_b_tools]
+                part_a_range = f"{min(part_a_suffixes):04d}-{max(part_a_suffixes):04d}" if part_a_suffixes else "-"
+                part_b_range = f"{min(part_b_suffixes):04d}-{max(part_b_suffixes):04d}" if part_b_suffixes else "-"
                 
-                def format_range(suffixes_list):
-                    if not suffixes_list:
-                        return "-"
-                    min_s = min(suffixes_list)
-                    max_s = max(suffixes_list)
-                    if min_s == max_s:
-                        return f"{min_s:04d}"
-                    return f"{min_s:04d} - {max_s:04d}"
-                
-                part_b_range = format_range(part_b_suffixes)
-                part_a_range = format_range(part_a_suffixes)
-                
-                for t in part_a_tools:
-                    match_map[t.qr_code] = part_b_range
-                for t in part_b_tools:
-                    match_map[t.qr_code] = part_a_range
+                for i, t in enumerate(subgroup):
+                    if i < half:
+                        match_map[t.qr_code] = part_b_range
+                    else:
+                        match_map[t.qr_code] = part_a_range
                 
     for t in tools:
         tr = ToolRead.from_orm(t)
