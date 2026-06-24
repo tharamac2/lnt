@@ -258,12 +258,7 @@ export default function Reports() {
                                     filteredTools.map((tool) => (
                                         <TableRow key={tool.id} className="hover:bg-gray-50/50">
                                             <TableCell className="font-medium text-[#1E3A8A]">
-                                                <span
-                                                    className="cursor-pointer underline decoration-dotted underline-offset-4 decoration-gray-400 hover:text-blue-700 hover:decoration-blue-700 transition-colors"
-                                                    onMouseEnter={() => setHoveredTool(tool)}
-                                                >
-                                                    {tool.description}
-                                                </span>
+                                                {tool.description}
                                             </TableCell>
                                             <TableCell className="font-mono text-xs">{tool.qr_code}</TableCell>
                                             <TableCell>{tool.make}</TableCell>
