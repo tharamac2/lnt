@@ -338,9 +338,7 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
 
   doc.setFontSize(7.5);
   doc.text('COPY DISTRIBUTION', left, y + 11);
-  const selectedCopies = copyDistribution && copyDistribution.length > 0
-    ? copyDistribution
-    : COPY_DISTRIBUTION_OPTIONS.map((opt) => opt.id);
+  const selectedCopies = copyDistribution || [];
 
   let copyXCursor = left + 30;
   const separator = '   ';

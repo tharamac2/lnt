@@ -11,12 +11,10 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { Checkbox } from './ui/checkbox';
 import { Trash2, Plus, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   buildDeliveryChallanDoc,
-  COPY_DISTRIBUTION_OPTIONS,
   DeliveryChallanItem,
   DeliveryChallanOptions,
 } from '../utils/deliveryChallan';
@@ -65,15 +63,10 @@ const DeliveryChallanPreviewDialog = ({
 }: DeliveryChallanPreviewDialogProps) => {
   const [fields, setFields] = useState<EditableFields>(emptyFields);
   const [items, setItems] = useState<DeliveryChallanItem[]>([]);
-  const [copyDistribution, setCopyDistribution] = useState<string[]>(
-    COPY_DISTRIBUTION_OPTIONS.map((opt) => opt.id)
-  );
+  // Copy Distribution checkboxes are always shown unchecked in the generated PDF
+  const copyDistribution: string[] = [];
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
-
-  const toggleCopyDistribution = (id: string, checked: boolean) => {
-    setCopyDistribution((prev) => (checked ? [...prev, id] : prev.filter((existing) => existing !== id)));
-  };
 
   const setField = (key: keyof EditableFields, value: string) => {
     setFields((prev) => ({ ...prev, [key]: value }));
@@ -108,11 +101,6 @@ const DeliveryChallanPreviewDialog = ({
         driverMobile: initialOptions.driverMobile || '',
       });
       setItems(initialOptions.items.map((item) => ({ ...item })));
-      setCopyDistribution(
-        initialOptions.copyDistribution && initialOptions.copyDistribution.length > 0
-          ? [...initialOptions.copyDistribution]
-          : COPY_DISTRIBUTION_OPTIONS.map((opt) => opt.id)
-      );
     }
   }, [open, initialOptions]);
 
@@ -391,25 +379,6 @@ const DeliveryChallanPreviewDialog = ({
             <div className="space-y-1.5">
               <Label>Remarks</Label>
               <Textarea value={fields.remarks} onChange={(e) => setField('remarks', e.target.value)} rows={2} />
-            </div>
-
-            {/* Copy distribution */}
-            <div className="space-y-2 border-t pt-4">
-              <Label className="text-xs font-semibold text-gray-500 uppercase">Copy Distribution</Label>
-              <div className="grid grid-cols-1 gap-2">
-                {COPY_DISTRIBUTION_OPTIONS.map((opt) => (
-                  <div key={opt.id} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`copy-dist-${opt.id}`}
-                      checked={copyDistribution.includes(opt.id)}
-                      onCheckedChange={(checked) => toggleCopyDistribution(opt.id, checked === true)}
-                    />
-                    <Label htmlFor={`copy-dist-${opt.id}`} className="text-sm font-normal cursor-pointer">
-                      {opt.label.replace(/^\d+\.\s*/, '')}
-                    </Label>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
 
