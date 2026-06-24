@@ -369,7 +369,7 @@ const DeliveryChallanPreviewDialog = ({
               <Label className="text-xs font-semibold text-gray-500 uppercase">Receipt Details</Label>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">RMN No.</Label>
+                  <Label className="text-xs">Site MRN No</Label>
                   <Input value={fields.receiptRmnNo} onChange={(e) => setField('receiptRmnNo', e.target.value)} />
                 </div>
                 <div className="space-y-1.5">

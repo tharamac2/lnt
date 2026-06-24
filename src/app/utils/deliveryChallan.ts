@@ -302,11 +302,9 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
     doc.text(col.label, col.x, y + 19.5, { maxWidth: col.w - 2 });
   });
 
-  doc.line(left, y + 21, left + recWidth, y + 21);
-
-  // Row 2: RMN No. | Date | Signature of Receiver
+  // Row 2: Site MRN No. | Date | Signature of Receiver
   const row2Cols = [
-    { label: '(RMN NO.)', value: receiptRmnNo, x: left + 2, w: 26 },
+    { label: 'Site MRN No', value: receiptRmnNo, x: left + 2, w: 26 },
     { label: '(DATE)', value: receiptDate, x: left + 30, w: 22 },
     { label: '(SIGNATURE OF RECEIVER)', value: '', x: left + 54, w: recWidth - 54 - 2 },
   ];
