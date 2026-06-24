@@ -287,21 +287,35 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   doc.text('FOR LARSEN & TOUBRO LIMITED CONSTRUCTION DIVISION', left + recWidth + 2, y + 6, { maxWidth: forLtWidth - 4 });
   doc.line(left, y + 10, left + recWidth, y + 10);
 
-  // Single-line columns within the Receipt Details box: RMN No. | Date | Driver Name | Mobile No. | Signature of Receiver
-  const recCols = [
-    { label: '(RMN NO.)', value: receiptRmnNo, x: left + 2, w: 20 },
-    { label: '(DATE)', value: receiptDate, x: left + 24, w: 16 },
-    { label: '(DRIVER NAME)', value: driverName, x: left + 42, w: 36 },
-    { label: '(MOBILE NO.)', value: driverMobile, x: left + 80, w: 26 },
-    { label: '(SIGNATURE OF RECEIVER)', value: '', x: left + 108, w: recWidth - 108 - 2 },
+  // Row 1: Driver Name | Mobile Number
+  const row1Cols = [
+    { label: '(DRIVER NAME)', value: driverName, x: left + 2, w: recWidth / 2 - 4 },
+    { label: '(MOBILE NO.)', value: driverMobile, x: left + recWidth / 2 + 2, w: recWidth / 2 - 4 },
   ];
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  recCols.forEach((col) => {
-    if (col.value) doc.text(String(col.value), col.x, y + recHeight - 13, { maxWidth: col.w - 2 });
+  row1Cols.forEach((col) => {
+    if (col.value) doc.text(String(col.value), col.x, y + 16, { maxWidth: col.w - 2 });
   });
   doc.setFontSize(6);
-  recCols.forEach((col) => {
+  row1Cols.forEach((col) => {
+    doc.text(col.label, col.x, y + 19.5, { maxWidth: col.w - 2 });
+  });
+
+  doc.line(left, y + 21, left + recWidth, y + 21);
+
+  // Row 2: RMN No. | Date | Signature of Receiver
+  const row2Cols = [
+    { label: '(RMN NO.)', value: receiptRmnNo, x: left + 2, w: 26 },
+    { label: '(DATE)', value: receiptDate, x: left + 30, w: 22 },
+    { label: '(SIGNATURE OF RECEIVER)', value: '', x: left + 54, w: recWidth - 54 - 2 },
+  ];
+  doc.setFontSize(7.5);
+  row2Cols.forEach((col) => {
+    if (col.value) doc.text(String(col.value), col.x, y + recHeight - 9, { maxWidth: col.w - 2 });
+  });
+  doc.setFontSize(6);
+  row2Cols.forEach((col) => {
     doc.text(col.label, col.x, y + recHeight - 3, { maxWidth: col.w - 2 });
   });
   y += recHeight;
