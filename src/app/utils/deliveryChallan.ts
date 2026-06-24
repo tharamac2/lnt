@@ -256,7 +256,7 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   doc.line(left + vehicleWidth + lrWidth, y, left + vehicleWidth + lrWidth, y + 20);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text('VEHICLE / PATCH THROUGH', left + 2, y + 6);
+  doc.text('DESPATCH THROUGH', left + 2, y + 6);
   doc.text('LR / RR NO. & DATE', left + vehicleWidth + 2, y + 6);
   doc.setFont('helvetica', 'normal');
   if (vehicleDetails) doc.text(vehicleDetails, left + 2, y + 14, { maxWidth: vehicleWidth - 4 });

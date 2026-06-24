@@ -346,7 +346,7 @@ const DeliveryChallanPreviewDialog = ({
               <Label className="text-xs font-semibold text-gray-500 uppercase">Transport & Freight</Label>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Vehicle / Patch Through</Label>
+                  <Label className="text-xs">Despatch Through</Label>
                   <Input value={fields.vehicleDetails} onChange={(e) => setField('vehicleDetails', e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
