@@ -21,7 +21,8 @@ import api from '../services/api';
 import { toast } from 'sonner';
 import { Html5Qrcode } from 'html5-qrcode';
 import ScannerDialog from '../components/ScannerDialog';
-import { generateDeliveryChallanPDF } from '../utils/deliveryChallan';
+import { DeliveryChallanOptions } from '../utils/deliveryChallan';
+import DeliveryChallanPreviewDialog from '../components/DeliveryChallanPreviewDialog';
 
 const StoreView = () => {
   const location = useLocation();
@@ -58,6 +59,9 @@ const StoreView = () => {
 
   // Last Transaction
   const [lastTransaction, setLastTransaction] = useState<any>(null);
+
+  // Delivery Challan Preview/Edit Dialog
+  const [challanDraft, setChallanDraft] = useState<DeliveryChallanOptions | null>(null);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -171,7 +175,7 @@ const StoreView = () => {
       }
     }
 
-    generateDeliveryChallanPDF({
+    setChallanDraft({
       type,
       consignee,
       siteCode,
@@ -183,12 +187,7 @@ const StoreView = () => {
         unit: 'NOS',
       }],
       filename: `${type === 'RECEIPT' ? 'Inward' : 'Outward'}_Challan_${tool.qr_code}_${Date.now()}.pdf`,
-    })
-      .then(() => toast.success(`${type === 'RECEIPT' ? 'Inward' : 'Outward'} Challan Downloaded`))
-      .catch((pdfError) => {
-        console.error("PDF Generation failed", pdfError);
-        toast.error("Failed to generate PDF");
-      });
+    });
   };
 
 
@@ -845,6 +844,12 @@ const StoreView = () => {
         </div>
       )
       }
+
+      <DeliveryChallanPreviewDialog
+        open={!!challanDraft}
+        onOpenChange={(o) => !o && setChallanDraft(null)}
+        initialOptions={challanDraft}
+      />
     </div >
   );
 };

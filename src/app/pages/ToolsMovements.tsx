@@ -9,7 +9,8 @@ import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { ArrowDownCircle, ArrowUpCircle, History, Save, Truck, X, Upload } from 'lucide-react';
 import api from '../services/api';
 import { toast } from 'sonner';
-import { generateDeliveryChallanPDF } from '../utils/deliveryChallan';
+import { DeliveryChallanOptions } from '../utils/deliveryChallan';
+import DeliveryChallanPreviewDialog from '../components/DeliveryChallanPreviewDialog';
 
 const ToolsMovements = () => {
   const location = useLocation();
@@ -30,6 +31,9 @@ const ToolsMovements = () => {
   });
   const [bulkMobileError, setBulkMobileError] = useState('');
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
+
+  // Delivery Challan Preview/Edit Dialog
+  const [challanDraft, setChallanDraft] = useState<DeliveryChallanOptions | null>(null);
 
   // Dealer Custom Fields State
   const [dealerCustomFields, setDealerCustomFields] = useState<any[]>([]);
@@ -124,7 +128,7 @@ const ToolsMovements = () => {
       }
     }
 
-    generateDeliveryChallanPDF({
+    setChallanDraft({
       type,
       consignee,
       siteCode,
@@ -136,12 +140,7 @@ const ToolsMovements = () => {
         unit: 'NOS',
       })),
       filename: `Bulk_${type === 'RECEIPT' ? 'Inward' : 'Outward'}_Challan_${Date.now()}.pdf`,
-    })
-      .then(() => toast.success(`${type === 'RECEIPT' ? 'Inward' : 'Outward'} Challan Downloaded`))
-      .catch((pdfError) => {
-        console.error("PDF Generation failed", pdfError);
-        toast.error("Failed to generate PDF");
-      });
+    });
   };
 
   const cancelBulkTransaction = () => {
@@ -262,12 +261,9 @@ const ToolsMovements = () => {
       const transactionDetails = bulkActionMode === 'in' ? bulkInSubCategory : bulkOutSubCategory;
       const pdfType = bulkActionMode === 'in' ? 'RECEIPT' : 'DISPATCH';
       const pdfRemarks = bulkFormData.remarks ? `${bulkFormData.remarks}${checklistStr}` : checklistStr.trim();
-      setTimeout(() => {
-        generateBulkPDF(updatedTools, transactionDetails, pdfRemarks, pdfType);
-      }, 500);
+      generateBulkPDF(updatedTools, transactionDetails, pdfRemarks, pdfType);
 
       cancelBulkTransaction();
-      navigate('/tools-movement-history');
     } catch (error) {
       console.error(error);
       toast.error("Failed to complete bulk transaction");
@@ -709,6 +705,17 @@ const ToolsMovements = () => {
           </CardContent>
         </Card>
       )}
+
+      <DeliveryChallanPreviewDialog
+        open={!!challanDraft}
+        onOpenChange={(o) => {
+          if (!o) {
+            setChallanDraft(null);
+            navigate('/tools-movement-history');
+          }
+        }}
+        initialOptions={challanDraft}
+      />
     </div>
   );
 };
