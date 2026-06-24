@@ -343,22 +343,37 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
     : COPY_DISTRIBUTION_OPTIONS.map((opt) => opt.id);
 
   let copyXCursor = left + 30;
-  const separator = '   |   ';
-  const visibleCopies = COPY_DISTRIBUTION_OPTIONS.filter((opt) => selectedCopies.includes(opt.id));
-  visibleCopies.forEach((opt, idx) => {
+  const separator = '   ';
+  const boxSize = 2.6;
+  COPY_DISTRIBUTION_OPTIONS.forEach((opt, idx) => {
     const label = opt.label.replace(/^\d+\.\s*/, '');
+    const isChecked = selectedCopies.includes(opt.id);
+
+    // Checkbox square
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.25);
+    const boxY = y + 11 - boxSize + 0.5;
+    doc.rect(copyXCursor, boxY, boxSize, boxSize);
+    if (isChecked) {
+      doc.setLineWidth(0.35);
+      doc.line(copyXCursor, boxY, copyXCursor + boxSize, boxY + boxSize);
+      doc.line(copyXCursor, boxY + boxSize, copyXCursor + boxSize, boxY);
+    }
+    copyXCursor += boxSize + 1;
+
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(220, 38, 38);
+    doc.setTextColor(isChecked ? 220 : 120, isChecked ? 38 : 120, isChecked ? 38 : 120);
     doc.text(label, copyXCursor, y + 11);
     copyXCursor += doc.getTextWidth(label);
 
-    if (idx < visibleCopies.length - 1) {
+    if (idx < COPY_DISTRIBUTION_OPTIONS.length - 1) {
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(0);
       doc.text(separator, copyXCursor, y + 11);
       copyXCursor += doc.getTextWidth(separator);
     }
   });
+  doc.setLineWidth(0.2);
   doc.setTextColor(0);
 
   return doc;
