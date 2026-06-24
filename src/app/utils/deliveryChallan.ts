@@ -275,29 +275,32 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   if (freightPaid) doc.text(String(freightPaid), freightX + freightLabelWidth + 20, y + 17);
   y += 20;
 
-  // --- Receipt Details / For L&T ---
-  const recHeight = 28;
+  // --- Receipt Details (own box) / For L&T (separate box) ---
+  const recHeight = 32;
+  const forLtWidth = 45;
+  const recWidth = width - forLtWidth;
   doc.rect(left, y, width, recHeight);
+  doc.line(left + recWidth, y, left + recWidth, y + recHeight);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.text('RECEIPT DETAILS', left + 2, y + 6);
-  doc.text('FOR LARSEN & TOUBRO LIMITED CONSTRUCTION DIVISION', right - 2, y + 6, { align: 'right', maxWidth: width / 2 });
-  doc.line(left, y + 10, right, y + 10);
+  doc.text('FOR LARSEN & TOUBRO LIMITED CONSTRUCTION DIVISION', left + recWidth + 2, y + 6, { maxWidth: forLtWidth - 4 });
+  doc.line(left, y + 10, left + recWidth, y + 10);
 
-  // Single-line columns: RMN No. | Date | Driver Name | Mobile No. | Signature of Receiver
+  // Single-line columns within the Receipt Details box: RMN No. | Date | Driver Name | Mobile No. | Signature of Receiver
   const recCols = [
-    { label: '(RMN NO.)', value: receiptRmnNo, x: left + 2, w: 26 },
-    { label: '(DATE)', value: receiptDate, x: left + 30, w: 22 },
-    { label: '(DRIVER NAME)', value: driverName, x: left + 54, w: 40 },
-    { label: '(MOBILE NO.)', value: driverMobile, x: left + 96, w: 34 },
-    { label: '(SIGNATURE OF RECEIVER)', value: '', x: left + 132, w: width - 132 - 2 },
+    { label: '(RMN NO.)', value: receiptRmnNo, x: left + 2, w: 20 },
+    { label: '(DATE)', value: receiptDate, x: left + 24, w: 16 },
+    { label: '(DRIVER NAME)', value: driverName, x: left + 42, w: 36 },
+    { label: '(MOBILE NO.)', value: driverMobile, x: left + 80, w: 26 },
+    { label: '(SIGNATURE OF RECEIVER)', value: '', x: left + 108, w: recWidth - 108 - 2 },
   ];
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   recCols.forEach((col) => {
-    if (col.value) doc.text(String(col.value), col.x, y + recHeight - 9, { maxWidth: col.w - 2 });
+    if (col.value) doc.text(String(col.value), col.x, y + recHeight - 13, { maxWidth: col.w - 2 });
   });
-  doc.setFontSize(6.5);
+  doc.setFontSize(6);
   recCols.forEach((col) => {
     doc.text(col.label, col.x, y + recHeight - 3, { maxWidth: col.w - 2 });
   });
