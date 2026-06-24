@@ -1864,12 +1864,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
                         />
                       </TableCell>
                       <TableCell className="font-medium text-[#1E3A8A]">
-                        <span
-                          className="cursor-pointer underline decoration-dotted underline-offset-4 decoration-gray-400 hover:text-blue-700 hover:decoration-blue-700 transition-colors"
-                          onMouseEnter={() => setHoveredTool(tool)}
-                        >
-                          {tool.description}
-                        </span>
+                        {tool.description}
                       </TableCell>
                       <TableCell className="font-mono text-xs text-blue-600 font-medium">
                         {tool.item_code || '-'}

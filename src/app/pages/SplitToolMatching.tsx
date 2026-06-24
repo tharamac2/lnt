@@ -93,40 +93,60 @@ const SplitToolMatching = () => {
                 const batchToolsRes = await api.get(`/tools/public/batch/${partA}`);
                 const batchTools = batchToolsRes.data;
 
-                // Filter for Derrick Poles
-                const derrickPoles = batchTools.filter((t: any) => isDerrickPole(t.description));
-
-                // Extract sequence number suffix from QR code
-                const getQrSuffix = (qr: string) => {
-                  const match = qr.match(/\d+$/);
-                  return match ? parseInt(match[0], 10) : 0;
+                // Function to identify the variant key (item_code if set, otherwise normalized description)
+                const getVariantKey = (t: any) => {
+                  if (t.item_code && t.item_code.trim()) {
+                    return `item_code:${t.item_code.trim()}`;
+                  }
+                  let desc = (t.description || '').toLowerCase().trim();
+                  if (desc.includes('dirreck')) {
+                    desc = desc.replace('dirreck', 'derrick');
+                  }
+                  return `desc:${desc}`;
                 };
 
-                // Sort ascending by sequence suffix
-                derrickPoles.sort((x: any, y: any) => getQrSuffix(x.qr_code) - getQrSuffix(y.qr_code));
+                const partAVariantKey = getVariantKey(partADetails);
+                const partBVariantKey = getVariantKey(tool);
 
-                // Find 0-based indexes in the sorted list
-                const idxA = derrickPoles.findIndex((t: any) => t.qr_code === partA);
-                const idxB = derrickPoles.findIndex((t: any) => t.qr_code === tool.qr_code);
-
-                if (idxA === -1 || idxB === -1) {
+                if (partAVariantKey !== partBVariantKey) {
+                  // Size variation or item code mismatch
                   setResult('mismatch');
                 } else {
-                  const N = derrickPoles.length;
-                  const half = Math.floor(N / 2);
-                  const isPairMatch = Math.abs(idxA - idxB) === half && half > 0;
+                  // Filter for Derrick Poles of the SAME variant key
+                  const variantPoles = batchTools.filter((t: any) => isDerrickPole(t.description) && getVariantKey(t) === partAVariantKey);
 
-                  if (!isPairMatch) {
+                  // Extract sequence number suffix from QR code
+                  const getQrSuffix = (qr: string) => {
+                    const match = qr.match(/\d+$/);
+                    return match ? parseInt(match[0], 10) : 0;
+                  };
+
+                  // Sort ascending by sequence suffix
+                  variantPoles.sort((x: any, y: any) => getQrSuffix(x.qr_code) - getQrSuffix(y.qr_code));
+
+                  // Find 0-based indexes in the sorted variant list
+                  const idxA = variantPoles.findIndex((t: any) => t.qr_code === partA);
+                  const idxB = variantPoles.findIndex((t: any) => t.qr_code === tool.qr_code);
+
+                  if (idxA === -1 || idxB === -1) {
                     setResult('mismatch');
                   } else {
-                    // Match found, check usability status
-                    const isAMatchStatus = partAStatus === 'usable';
-                    const isBMatchStatus = (tool.status || 'usable') === 'usable';
+                    const M = variantPoles.length;
+                    const half = Math.floor(M / 2);
+                    const isPairMatch = ((idxA < half && idxB >= half) || (idxB < half && idxA >= half)) && half > 0;
 
-                    if (isAMatchStatus && isBMatchStatus) {
-                      setResult('match');
-                    } else {
+                    if (!isPairMatch) {
                       setResult('mismatch');
+                    } else {
+                      // Match found, check usability status
+                      const isAMatchStatus = partAStatus === 'usable';
+                      const isBMatchStatus = (tool.status || 'usable') === 'usable';
+
+                      if (isAMatchStatus && isBMatchStatus) {
+                        setResult('match');
+                      } else {
+                        setResult('mismatch');
+                      }
                     }
                   }
                 }

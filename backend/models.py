@@ -93,6 +93,8 @@ class ToolBase(SQLModel):
     is_printed: bool = Field(default=False)
     is_deleted: bool = Field(default=False)
     custom_fields: Optional[str] = None
+    pending_return_date: Optional[datetime] = None
+    pending_reason: Optional[str] = None
 
 class Tool(ToolBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -134,6 +136,8 @@ class ToolUpdate(SQLModel):
     date_of_supply: Optional[datetime] = None
     debit_to: Optional[str] = None
     custom_fields: Optional[str] = None
+    pending_return_date: Optional[datetime] = None
+    pending_reason: Optional[str] = None
 
 class InspectionBase(SQLModel):
     tool_id: int = Field(foreign_key="tool.id")

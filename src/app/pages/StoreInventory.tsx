@@ -46,6 +46,81 @@ const StoreInventory = () => {
   const [selectedToolIds, setSelectedToolIds] = useState<Set<number>>(new Set());
   const lastSelectedIndexRef = useRef<number>(-1);
 
+  // Pending Return Resolution State
+  const [selectedPendingTool, setSelectedPendingTool] = useState<any | null>(null);
+  const [resolveAction, setResolveAction] = useState<'returned' | 'missing' | 'pending'>('returned');
+  const [resolveDays, setResolveDays] = useState<number>(40);
+  const [resolveReason, setResolveReason] = useState<string>('');
+  const [resolveSubmitting, setResolveSubmitting] = useState<boolean>(false);
+
+  const getDaysRemaining = (returnDateStr: string) => {
+    if (!returnDateStr) return 0;
+    const returnDate = new Date(returnDateStr);
+    const today = new Date();
+    returnDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    const diffTime = returnDate.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const handleOpenResolveModal = (tool: any) => {
+    setSelectedPendingTool(tool);
+    setResolveAction('returned');
+    setResolveDays(40);
+    setResolveReason(tool.pending_reason || '');
+  };
+
+  const handleResolveSubmit = async () => {
+    if (!selectedPendingTool) return;
+
+    if (resolveAction === 'pending') {
+      if (!resolveDays || resolveDays <= 0) {
+        toast.error("Please enter a valid number of days");
+        return;
+      }
+      if (!resolveReason || !resolveReason.trim()) {
+        toast.error("Please enter a reason for extension");
+        return;
+      }
+    }
+
+    setResolveSubmitting(true);
+    try {
+      const payload: any = {};
+      if (resolveAction === 'returned') {
+        payload.status = 'usable';
+        payload.current_site = storeLocation;
+        payload.subcontractor_name = null;
+        payload.subcontractor_code = null;
+        payload.pending_return_date = null;
+        payload.pending_reason = null;
+        payload.remarks = `Resolved Pending Return: Returned to Store.`;
+      } else if (resolveAction === 'missing') {
+        payload.status = 'missing';
+        payload.pending_return_date = null;
+        payload.pending_reason = null;
+        payload.remarks = `Resolved Pending Return: Marked as Missing.`;
+      } else if (resolveAction === 'pending') {
+        payload.status = 'pending';
+        const returnDate = new Date();
+        returnDate.setDate(returnDate.getDate() + resolveDays);
+        payload.pending_return_date = returnDate.toISOString();
+        payload.pending_reason = resolveReason;
+        payload.remarks = `Extended Pending Return: ${resolveDays} days. Reason: ${resolveReason}.`;
+      }
+
+      await api.patch(`/tools/${selectedPendingTool.id}`, payload);
+      toast.success("Tool status updated successfully");
+      setSelectedPendingTool(null);
+      refreshInventory();
+    } catch (error) {
+      console.error("Failed to resolve tool status", error);
+      toast.error("Failed to resolve tool status");
+    } finally {
+      setResolveSubmitting(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'usable': return 'bg-[#16A34A] text-white';
@@ -54,6 +129,7 @@ const StoreInventory = () => {
       case 'missing': return 'bg-orange-100 text-orange-700';
       case 'stolen': return 'bg-red-900 text-white';
       case 'scrapped': return 'bg-neutral-800 text-white';
+      case 'pending': return 'bg-amber-500 text-white';
       default: return 'bg-gray-100 text-gray-700';
     }
   };
@@ -64,6 +140,10 @@ const StoreInventory = () => {
       if (tool.make) makes.add(tool.make);
     });
     return Array.from(makes).sort();
+  }, [inventoryTools]);
+
+  const pendingTools = useMemo(() => {
+    return inventoryTools.filter((tool) => tool.status === 'pending');
   }, [inventoryTools]);
 
   const filteredInventoryTools = useMemo(() => {
@@ -193,6 +273,92 @@ const StoreInventory = () => {
         </div>
       </div>
 
+      {pendingTools.length > 0 && (
+        <Card className="border-l-4 border-l-amber-500 bg-amber-50/10 animate-in fade-in slide-in-from-top-2 duration-300">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+              Pending Returns & Reminders
+              <Badge variant="outline" className="bg-amber-100/50 text-amber-800 border-amber-200">
+                {pendingTools.length} Tool{pendingTools.length === 1 ? '' : 's'}
+              </Badge>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Tools currently marked as pending return. Please resolve status for overdue tools.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-6 pb-4">
+            <div className="overflow-x-auto border rounded-lg bg-white">
+              <Table>
+                <TableHeader className="bg-slate-50">
+                  <TableRow>
+                    <TableHead className="text-xs font-semibold py-2">Tool Details</TableHead>
+                    <TableHead className="text-xs font-semibold py-2">Subcontractor/Site</TableHead>
+                    <TableHead className="text-xs font-semibold py-2">Expected Return Date</TableHead>
+                    <TableHead className="text-xs font-semibold py-2">Days Left</TableHead>
+                    <TableHead className="text-xs font-semibold py-2">Reason</TableHead>
+                    <TableHead className="text-xs font-semibold py-2 text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingTools.map((tool) => {
+                    const daysLeft = getDaysRemaining(tool.pending_return_date);
+                    const isOverdue = daysLeft <= 0;
+                    return (
+                      <TableRow key={tool.id} className="hover:bg-slate-50/50">
+                        <TableCell className="py-2.5">
+                          <div className="font-semibold text-slate-800 text-xs">{tool.description}</div>
+                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">{tool.qr_code}</div>
+                        </TableCell>
+                        <TableCell className="py-2.5 text-xs text-slate-600">
+                          {tool.subcontractor_name ? (
+                            <div>
+                              <span className="font-medium text-slate-700">{tool.subcontractor_name}</span>
+                              <span className="block text-[10px] text-slate-400 font-mono">Code: {tool.subcontractor_code}</span>
+                            </div>
+                          ) : (
+                            <span>{tool.current_site || 'Store'}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-2.5 text-xs text-slate-650">
+                          {tool.pending_return_date ? new Date(tool.pending_return_date).toLocaleDateString() : 'N/A'}
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          {isOverdue ? (
+                            <Badge className="bg-red-100 hover:bg-red-150 text-red-700 border-red-200 text-[10px] py-0.5 font-bold uppercase">
+                              Overdue by {Math.abs(daysLeft)} Day{Math.abs(daysLeft) === 1 ? '' : 's'}
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-amber-100 hover:bg-amber-150 text-amber-700 border-amber-200 text-[10px] py-0.5 font-bold uppercase">
+                              {daysLeft} Day{daysLeft === 1 ? '' : 's'} left
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-2.5 text-xs text-slate-550 max-w-[150px] truncate" title={tool.pending_reason}>
+                          {tool.pending_reason || 'N/A'}
+                        </TableCell>
+                        <TableCell className="py-2.5 text-right">
+                          <Button
+                            size="sm"
+                            onClick={() => handleOpenResolveModal(tool)}
+                            className="h-7 text-xs px-2.5 bg-[#1E3A8A] hover:bg-blue-800 text-white font-medium"
+                          >
+                            Resolve Status
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="animate-in fade-in slide-in-from-top-4 duration-500">
         <CardHeader className="bg-gray-50 pb-2 flex flex-row items-center justify-between">
           <div>
@@ -242,6 +408,7 @@ const StoreInventory = () => {
                 <SelectItem value="scrapped">Scrapped</SelectItem>
                 <SelectItem value="missing">Missing</SelectItem>
                 <SelectItem value="stolen">Stolen</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
               </SelectContent>
             </Select>
             <Select value={makeFilter} onValueChange={setMakeFilter}>
@@ -362,6 +529,124 @@ const StoreInventory = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Resolve Status Modal */}
+      {selectedPendingTool && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-[#1E3A8A] text-white px-6 py-4 flex items-center justify-between">
+              <h3 className="font-semibold text-lg">Resolve Tool Return Status</h3>
+              <button 
+                onClick={() => setSelectedPendingTool(null)}
+                className="text-white/80 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs">
+                <div className="font-semibold text-slate-800">{selectedPendingTool.description}</div>
+                <div className="font-mono text-slate-500 mt-0.5">{selectedPendingTool.qr_code}</div>
+                <div className="text-slate-500 mt-1">
+                  Current reason: <span className="font-medium text-slate-700">{selectedPendingTool.pending_reason || 'N/A'}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">Resolution Action</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setResolveAction('returned')}
+                    className={`py-2 px-3 rounded-lg text-xs font-bold border text-center transition-all ${
+                      resolveAction === 'returned'
+                        ? 'bg-green-600 border-green-600 text-white shadow-sm shadow-green-100'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    Returned
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResolveAction('pending')}
+                    className={`py-2 px-3 rounded-lg text-xs font-bold border text-center transition-all ${
+                      resolveAction === 'pending'
+                        ? 'bg-amber-550 border-amber-550 text-white shadow-sm shadow-amber-100'
+                        : 'bg-white border-slate-200 text-slate-650 hover:bg-slate-50'
+                    }`}
+                  >
+                    Extend
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResolveAction('missing')}
+                    className={`py-2 px-3 rounded-lg text-xs font-bold border text-center transition-all ${
+                      resolveAction === 'missing'
+                        ? 'bg-red-600 border-red-600 text-white shadow-sm shadow-red-100'
+                        : 'bg-white border-slate-200 text-slate-605 hover:bg-slate-50'
+                    }`}
+                  >
+                    Missing
+                  </button>
+                </div>
+              </div>
+
+              {resolveAction === 'pending' && (
+                <div className="space-y-3 p-3 bg-amber-50/50 rounded-lg border border-amber-100/50 animate-in slide-in-from-top-2 duration-200">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-amber-900">Extend By Days</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={resolveDays}
+                      onChange={(e) => setResolveDays(parseInt(e.target.value) || 0)}
+                      className="bg-white border-amber-200 focus:border-amber-400 focus:ring-amber-400"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-amber-900">Reason for Extension</label>
+                    <Input
+                      placeholder="e.g. Subcontractor still working..."
+                      value={resolveReason}
+                      onChange={(e) => setResolveReason(e.target.value)}
+                      className="bg-white border-amber-200 focus:border-amber-400 focus:ring-amber-400"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {resolveAction === 'returned' && (
+                <div className="p-3 bg-green-50/50 rounded-lg border border-green-100 text-xs text-green-800">
+                  <strong>Action:</strong> Tool status will be reset to <b>Usable</b>. It will be returned to store (<b>{storeLocation}</b>) and the subcontractor assignment will be cleared.
+                </div>
+              )}
+
+              {resolveAction === 'missing' && (
+                <div className="p-3 bg-red-50/50 rounded-lg border border-red-100 text-xs text-red-800">
+                  <strong>Action:</strong> Tool will be permanently marked as <b>Missing</b>. This will be reflected in the Admin Dashboard.
+                </div>
+              )}
+            </div>
+            
+            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-2 border-t">
+              <Button 
+                variant="outline" 
+                onClick={() => setSelectedPendingTool(null)}
+                disabled={resolveSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button 
+                className="bg-[#1E3A8A] hover:bg-blue-800 text-white"
+                onClick={handleResolveSubmit}
+                disabled={resolveSubmitting}
+              >
+                {resolveSubmitting ? 'Saving...' : 'Confirm Resolution'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

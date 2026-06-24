@@ -31,6 +31,65 @@ const ToolsMovements = () => {
   });
   const [bulkMobileError, setBulkMobileError] = useState('');
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [toolConfigs, setToolConfigs] = useState<{ [key: number]: { status: 'received' | 'pending' | 'missing' | 'unconfigured'; expectedDays: number; reason: string } }>({});
+  const [notReturnedTools, setNotReturnedTools] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchAndFilterNotReturned = async () => {
+      if (bulkActionMode !== 'in' || bulkTools.length === 0) {
+        setNotReturnedTools([]);
+        return;
+      }
+      try {
+        const res = await api.get(`/tools/?limit=10000000`);
+        const allTools = res.data;
+
+        const selectedSubconNames = Array.from(new Set(bulkTools.map(t => t.subcontractor_name).filter(Boolean)));
+        const selectedPreviousSites = Array.from(new Set(bulkTools.map(t => t.previous_site).filter(Boolean)));
+        const selectedIds = new Set(bulkTools.map(t => t.id));
+
+        let candidateTools: any[] = [];
+
+        if (bulkInSubCategory === 'subcon_return') {
+          candidateTools = allTools.filter((t: any) => 
+            !selectedIds.has(t.id) &&
+            t.current_site === storeLocation &&
+            selectedSubconNames.includes(t.subcontractor_name)
+          );
+        } else if (bulkInSubCategory === 'site_receive') {
+          candidateTools = allTools.filter((t: any) => 
+            !selectedIds.has(t.id) &&
+            t.current_site === storeLocation &&
+            selectedPreviousSites.includes(t.previous_site)
+          );
+        }
+
+        setNotReturnedTools(candidateTools);
+      } catch (err) {
+        console.error("Failed to fetch and filter not returned tools", err);
+      }
+    };
+
+    fetchAndFilterNotReturned();
+  }, [bulkTools, bulkInSubCategory, bulkActionMode, storeLocation]);
+
+  useEffect(() => {
+    if (notReturnedTools.length > 0) {
+      setToolConfigs(prev => {
+        const next = { ...prev };
+        notReturnedTools.forEach(tool => {
+          if (!next[tool.id]) {
+            next[tool.id] = {
+              status: 'unconfigured',
+              expectedDays: 40,
+              reason: ''
+            };
+          }
+        });
+        return next;
+      });
+    }
+  }, [notReturnedTools]);
 
   // Delivery Challan Preview/Edit Dialog
   const [challanDraft, setChallanDraft] = useState<DeliveryChallanOptions | null>(null);
@@ -151,6 +210,7 @@ const ToolsMovements = () => {
     setSelectedCustomFields([]);
     setCustomFieldValues({});
     setShowCustomFieldsSelector(false);
+    setToolConfigs({});
   };
 
   const handleBulkSubmit = async () => {
@@ -167,6 +227,22 @@ const ToolsMovements = () => {
     if (bulkActionMode === 'out' && bulkOutSubCategory === 'site_transfer' && !bulkFormData.targetSite) {
       toast.error("Please enter a destination site");
       return;
+    }
+
+    if (bulkActionMode === 'in') {
+      for (const tool of notReturnedTools) {
+        const config = toolConfigs[tool.id];
+        if (config && config.status === 'pending') {
+          if (!config.expectedDays || config.expectedDays <= 0) {
+            toast.error(`Please enter a valid number of expected days for not-returned tool ${tool.qr_code}`);
+            return;
+          }
+          if (!config.reason || !config.reason.trim()) {
+            toast.error(`Please enter a reason for delay for not-returned tool ${tool.qr_code}`);
+            return;
+          }
+        }
+      }
     }
 
     let toolsToProcess = [...bulkTools];
@@ -209,25 +285,28 @@ const ToolsMovements = () => {
         checklistStr = ` [Checklist: ${items.join(', ')}]`;
       }
 
+      // 1. Process all selected tools (they are marked Received/Returned)
       for (const tool of toolsToProcess) {
         const payload: any = { previous_site: tool.current_site };
 
         if (bulkActionMode === 'in') {
+          payload.status = 'usable';
           payload.current_site = storeLocation;
+          payload.pending_return_date = null;
+          payload.pending_reason = null;
           if (bulkInSubCategory === 'subcon_return') {
             payload.subcontractor_name = null;
             payload.subcontractor_code = null;
-            payload.remarks = `Returned from Sub-Contractor (Bulk). ${bulkFormData.remarks}${checklistStr}`;
+            payload.remarks = `Returned from Sub-Contractor. ${bulkFormData.remarks}${checklistStr}`;
           } else if (bulkInSubCategory === 'new_product') {
-            payload.remarks = `New Product Received (Bulk). ${bulkFormData.remarks}${checklistStr}`;
+            payload.remarks = `New Product Received. ${bulkFormData.remarks}${checklistStr}`;
           } else if (bulkInSubCategory === 'site_receive') {
-            payload.remarks = `Received from Site ${tool.current_site} (Bulk). ${bulkFormData.remarks}${checklistStr}`;
+            payload.remarks = `Received from Site ${tool.current_site}. ${bulkFormData.remarks}${checklistStr}`;
           } else if (bulkInSubCategory === 'found_recovered') {
-            payload.status = 'usable';
             payload.debit_to = null;
             payload.subcontractor_name = null;
             payload.subcontractor_code = null;
-            payload.remarks = `Tool Found/Recovered (Bulk). Previous status: ${tool.status}. ${bulkFormData.remarks}${checklistStr}`;
+            payload.remarks = `Tool Found/Recovered. Previous status: ${tool.status}. ${bulkFormData.remarks}${checklistStr}`;
           }
         } else {
           if (bulkOutSubCategory === 'subcon_work') {
@@ -256,12 +335,44 @@ const ToolsMovements = () => {
         updatedTools.push({ ...tool, ...payload });
       }
 
+      // 2. Process not-returned tools that are explicitly configured as pending or missing
+      if (bulkActionMode === 'in') {
+        for (const tool of notReturnedTools) {
+          const config = toolConfigs[tool.id];
+          if (config && (config.status === 'pending' || config.status === 'missing')) {
+            const payload: any = {};
+            if (config.status === 'missing') {
+              payload.status = 'missing';
+              payload.pending_return_date = null;
+              payload.pending_reason = null;
+              payload.remarks = `Marked as Missing during receipt. ${bulkFormData.remarks}`;
+            } else if (config.status === 'pending') {
+              payload.status = 'pending';
+              const days = config.expectedDays || 40;
+              const returnDate = new Date();
+              returnDate.setDate(returnDate.getDate() + days);
+              payload.pending_return_date = returnDate.toISOString();
+              payload.pending_reason = config.reason || 'Pending return';
+              payload.remarks = `Marked as Pending return (${days} days: ${payload.pending_reason}). ${bulkFormData.remarks}`;
+            }
+            await api.patch(`/tools/${tool.id}`, payload);
+          }
+        }
+      }
+
       toast.success(`Bulk ${bulkActionMode === 'in' ? 'Receipt' : 'Dispatch'} recorded for ${toolsToProcess.length} item(s)`);
 
       const transactionDetails = bulkActionMode === 'in' ? bulkInSubCategory : bulkOutSubCategory;
       const pdfType = bulkActionMode === 'in' ? 'RECEIPT' : 'DISPATCH';
       const pdfRemarks = bulkFormData.remarks ? `${bulkFormData.remarks}${checklistStr}` : checklistStr.trim();
-      generateBulkPDF(updatedTools, transactionDetails, pdfRemarks, pdfType);
+      const toolsToPrint = pdfType === 'RECEIPT'
+        ? updatedTools.filter(t => t.status === 'usable')
+        : updatedTools;
+      if (toolsToPrint.length > 0) {
+        generateBulkPDF(toolsToPrint, transactionDetails, pdfRemarks, pdfType);
+      } else {
+        toast.info("No received tools to print on the Receipt Challan");
+      }
 
       cancelBulkTransaction();
     } catch (error) {
@@ -350,6 +461,175 @@ const ToolsMovements = () => {
                 {bulkInSubCategory === 'found_recovered' && (
                   <div className="bg-green-50 p-3 rounded text-sm text-green-800 border border-green-200">
                     <strong>Action:</strong> Selected tools' status will be reset to <b>Usable</b>. Liability (Debit To) will be cleared. Tools returned to Store.
+                  </div>
+                )}
+
+                {/* Returned Tools (Arrived) Section */}
+                <div className="space-y-4 pt-4 border-t">
+                  <Label className="text-base font-semibold text-[#0F172A]">Returned Tools (Arrived)</Label>
+                  <p className="text-xs text-gray-500">
+                    These are the selected tools that have returned to the store.
+                  </p>
+                  <div className="overflow-x-auto border rounded-lg bg-white">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-slate-50 text-slate-700 text-xs uppercase tracking-wider border-b">
+                        <tr>
+                          <th className="px-4 py-3 font-semibold">Tool Details</th>
+                          <th className="px-4 py-3 font-semibold">Current Site / Subcontractor</th>
+                          <th className="px-4 py-3 font-semibold">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {bulkTools.map((tool) => (
+                          <tr key={tool.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-3">
+                              <div className="font-semibold text-slate-800 text-xs">{tool.description}</div>
+                              <div className="text-[10px] text-slate-400 font-mono mt-0.5">{tool.qr_code}</div>
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 text-xs">
+                              <div>{tool.current_site || 'Store'}</div>
+                              {tool.subcontractor_name && (
+                                <div className="text-[10px] text-slate-400 mt-0.5">Subcon: {tool.subcontractor_name}</div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold bg-green-100 text-green-800 border border-green-200">
+                                Received (Arrived)
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Not Returned Tools Section */}
+                {notReturnedTools.length > 0 && (
+                  <div className="space-y-4 pt-4 border-t animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex flex-col gap-1">
+                      <Label className="text-base font-semibold text-[#0F172A] flex items-center gap-2">
+                        Not Returned Tools (Pending or Missing)
+                        <Badge variant="outline" className="bg-red-50 text-red-800 border-red-200 text-[10px]">
+                          {notReturnedTools.length} Item{notReturnedTools.length === 1 ? '' : 's'}
+                        </Badge>
+                      </Label>
+                      <p className="text-xs text-gray-500">
+                        These are the other tools held by this subcontractor / site that were not selected. Specify whether they are Pending or Missing.
+                      </p>
+                    </div>
+                    <div className="overflow-x-auto border rounded-lg bg-white">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 text-slate-700 text-xs uppercase tracking-wider border-b">
+                          <tr>
+                            <th className="px-4 py-3 font-semibold">Tool Details</th>
+                            <th className="px-4 py-3 font-semibold">Current Site / Subcontractor</th>
+                            <th className="px-4 py-3 font-semibold w-72">Action / Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {notReturnedTools.map((tool) => {
+                            const config = toolConfigs[tool.id] || { status: 'unconfigured', expectedDays: 40, reason: '' };
+                            return (
+                              <tr key={tool.id} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="px-4 py-3">
+                                  <div className="font-semibold text-slate-800 text-xs">{tool.description}</div>
+                                  <div className="text-[10px] text-slate-400 font-mono mt-0.5">{tool.qr_code}</div>
+                                </td>
+                                <td className="px-4 py-3 text-slate-600 text-xs">
+                                  <div>{tool.current_site || 'Store'}</div>
+                                  {tool.subcontractor_name && (
+                                    <div className="text-[10px] text-slate-400 mt-0.5">Subcon: {tool.subcontractor_name}</div>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="space-y-2">
+                                    <div className="flex gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => setToolConfigs(prev => ({
+                                          ...prev,
+                                          [tool.id]: { ...prev[tool.id], status: 'unconfigured' }
+                                        }))}
+                                        className={`px-2 py-1 rounded text-[10px] font-semibold border transition-all ${
+                                          config.status === 'unconfigured'
+                                            ? 'bg-slate-100 border-slate-350 text-slate-800 shadow-sm'
+                                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                        }`}
+                                      >
+                                        Unchanged
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setToolConfigs(prev => ({
+                                          ...prev,
+                                          [tool.id]: { ...prev[tool.id], status: 'pending' }
+                                        }))}
+                                        className={`px-2 py-1 rounded text-[10px] font-semibold border transition-all ${
+                                          config.status === 'pending'
+                                            ? 'bg-amber-550 border-amber-550 text-white shadow-sm shadow-amber-100'
+                                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-55'
+                                        }`}
+                                      >
+                                        Pending
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setToolConfigs(prev => ({
+                                          ...prev,
+                                          [tool.id]: { ...prev[tool.id], status: 'missing' }
+                                        }))}
+                                        className={`px-2 py-1 rounded text-[10px] font-semibold border transition-all ${
+                                          config.status === 'missing'
+                                            ? 'bg-red-650 border-red-650 text-white shadow-sm shadow-red-100'
+                                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                        }`}
+                                      >
+                                        Missing
+                                      </button>
+                                    </div>
+
+                                    {config.status === 'pending' && (
+                                      <div className="space-y-1 bg-amber-50/50 p-2 rounded border border-amber-100/50 animate-in slide-in-from-top-1 duration-200">
+                                        <div className="flex items-center gap-1.5">
+                                          <label className="text-[9px] font-bold text-amber-800 uppercase tracking-wider shrink-0 w-12">Days:</label>
+                                          <Input
+                                            type="number"
+                                            min={1}
+                                            placeholder="Days"
+                                            value={config.expectedDays || ''}
+                                            onChange={(e) => {
+                                              const val = parseInt(e.target.value) || 0;
+                                              setToolConfigs(prev => ({
+                                                ...prev,
+                                                [tool.id]: { ...prev[tool.id], expectedDays: val }
+                                              }));
+                                            }}
+                                            className="h-6 text-[10px] py-0.5 px-1.5 border-amber-200 focus:border-amber-400 focus:ring-amber-400 bg-white"
+                                          />
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                          <label className="text-[9px] font-bold text-amber-800 uppercase tracking-wider shrink-0 w-12">Reason:</label>
+                                          <Input
+                                            placeholder="Reason for delay"
+                                            value={config.reason || ''}
+                                            onChange={(e) => setToolConfigs(prev => ({
+                                              ...prev,
+                                              [tool.id]: { ...prev[tool.id], reason: e.target.value }
+                                            }))}
+                                            className="h-6 text-[10px] py-0.5 px-1.5 border-amber-200 focus:border-amber-400 focus:ring-amber-400 bg-white"
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
