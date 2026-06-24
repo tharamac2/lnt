@@ -162,22 +162,34 @@ def populate_exact_matches(tools: List[Tool], session: Session) -> List[ToolRead
         
         batch_derrick_poles = [t for t in batch_tools if is_derrick_pole(t.description)]
         
+        # Group by variant (item_code if present, otherwise normalized description)
+        groups = {}
+        for t in batch_derrick_poles:
+            if t.item_code and t.item_code.strip():
+                key = f"item_code:{t.item_code.strip()}"
+            else:
+                desc = (t.description or '').lower().strip()
+                if 'dirreck' in desc:
+                    desc = desc.replace('dirreck', 'derrick')
+                key = f"desc:{desc}"
+            groups.setdefault(key, []).append(t)
+            
         def get_qr_suffix(qr):
             import re
             match = re.search(r'\d+$', qr)
             return int(match.group(0)) if match else 0
             
-        batch_derrick_poles.sort(key=lambda t: get_qr_suffix(t.qr_code))
-        
-        N = len(batch_derrick_poles)
-        half = N // 2
-        if N >= 2 and half > 0:
-            for i, t in enumerate(batch_derrick_poles):
-                if i < half:
-                    match_t = batch_derrick_poles[i + half]
-                else:
-                    match_t = batch_derrick_poles[i - half]
-                match_map[t.qr_code] = match_t.qr_code
+        for key, subgroup in groups.items():
+            subgroup.sort(key=lambda t: get_qr_suffix(t.qr_code))
+            N = len(subgroup)
+            half = N // 2
+            if N >= 2 and half > 0:
+                for i, t in enumerate(subgroup):
+                    if i < half:
+                        match_t = subgroup[i + half]
+                    else:
+                        match_t = subgroup[i - half]
+                    match_map[t.qr_code] = match_t.qr_code
                 
     for t in tools:
         tr = ToolRead.from_orm(t)
