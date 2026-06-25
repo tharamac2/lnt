@@ -219,16 +219,18 @@ const StoreView = () => {
   const generatePDF = (tool: any, transactionDetails: string, remarks: string, type: 'RECEIPT' | 'DESPATCH' = 'RECEIPT') => {
     let consignee = storeLocation;
     let siteCode: string | undefined;
+    let vendorCode: string | undefined;
 
     if (type === 'DESPATCH') {
       if (transactionDetails === 'subcon_work') {
         consignee = tool.subcontractor_name || 'Sub-Contractor';
-        siteCode = tool.subcontractor_code || undefined;
+        siteCode = tool.current_site || undefined;
+        vendorCode = tool.subcontractor_code || undefined;
       } else if (transactionDetails === 'site_transfer') {
         consignee = tool.current_site || 'Site';
       } else if (transactionDetails === 'scrap_disposal') {
         consignee = tool.subcontractor_name || 'Scrap Dealer';
-        siteCode = tool.subcontractor_code || undefined;
+        vendorCode = tool.subcontractor_code || undefined;
       }
     }
 
@@ -236,6 +238,7 @@ const StoreView = () => {
       type,
       consignee,
       siteCode,
+      vendorCode,
       remarks,
       items: [{
         description: tool.description,

@@ -191,16 +191,18 @@ const ToolsMovements = () => {
   const generateBulkPDF = (tools: any[], transactionDetails: string, remarks: string, type: 'RECEIPT' | 'DESPATCH') => {
     let consignee = storeLocation;
     let siteCode: string | undefined;
+    let vendorCode: string | undefined;
 
     if (type === 'DESPATCH') {
       if (transactionDetails === 'subcon_work') {
         consignee = bulkFormData.subcontractorName || 'Sub-Contractor';
-        siteCode = bulkFormData.subcontractorCode || undefined;
+        siteCode = bulkFormData.targetSite || undefined;
+        vendorCode = bulkFormData.subcontractorCode || undefined;
       } else if (transactionDetails === 'site_transfer') {
         consignee = bulkFormData.targetSite || 'Site';
       } else if (transactionDetails === 'scrap_disposal') {
         consignee = bulkFormData.subcontractorName || 'Scrap Dealer';
-        siteCode = bulkFormData.subcontractorCode || undefined;
+        vendorCode = bulkFormData.subcontractorCode || undefined;
       }
     }
 
@@ -208,6 +210,7 @@ const ToolsMovements = () => {
       type,
       consignee,
       siteCode,
+      vendorCode,
       remarks,
       items: tools.map((tool) => ({
         description: tool.description,
@@ -708,7 +711,7 @@ const ToolsMovements = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Sub-Contractor Code</Label>
+                    <Label>Vendor Code</Label>
                     <Input
                       placeholder="Code"
                       value={bulkFormData.subcontractorCode}

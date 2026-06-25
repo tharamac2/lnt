@@ -133,10 +133,10 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   doc.setFontSize(10);
   doc.text(consignee || '-', leftColRight + 2, box1Top + 11, { maxWidth: width - leftColWidth - 4 });
 
-  // Right column bottom: Site Code No. (same row height as DC NO. / DATE)
+  // Right column bottom: Site Code (same row height as DC NO. / DATE)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text('SITE CODE NO.', leftColRight + 2, subRowY + 5);
+  doc.text('SITE CODE', leftColRight + 2, subRowY + 5);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   if (siteCode) doc.text(siteCode, leftColRight + 2, subRowY + 11, { maxWidth: width - leftColWidth - 4 });
