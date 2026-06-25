@@ -61,7 +61,7 @@ const ToolsMovementHistory = () => {
     const isInbound = m.to_site === storeLocation;
     const tool = m.tool || {};
     setChallanDraft({
-      type: isInbound ? 'RECEIPT' : 'DISPATCH',
+      type: isInbound ? 'RECEIPT' : 'DESPATCH',
       consignee: isInbound ? (storeLocation || 'Store') : (m.to_site || 'Site'),
       date: m.timestamp ? new Date(m.timestamp).toLocaleDateString() : undefined,
       remarks: m.remarks || '',
@@ -94,7 +94,7 @@ const ToolsMovementHistory = () => {
               <Truck className="text-[#1E3A8A] w-5 h-5" />
               Movement History
             </CardTitle>
-            <CardDescription>Tools received at or dispatched from {storeLocation || 'your site'}</CardDescription>
+            <CardDescription>Tools received at or despatched from {storeLocation || 'your site'}</CardDescription>
           </div>
           <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 shadow-sm text-sm py-1 px-3">
             {filteredMovements.length} of {movements.length} {movements.length === 1 ? 'Record' : 'Records'}
