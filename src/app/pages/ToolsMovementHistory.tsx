@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
-import { ArrowDownCircle, ArrowUpCircle, Search, Truck, X } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { ArrowDownCircle, ArrowUpCircle, Download, Search, Truck, X } from 'lucide-react';
 import api from '../services/api';
 import {
   Table,
@@ -12,12 +13,15 @@ import {
   TableHeader,
   TableRow,
 } from '../components/ui/table';
+import { DeliveryChallanOptions } from '../utils/deliveryChallan';
+import DeliveryChallanPreviewDialog from '../components/DeliveryChallanPreviewDialog';
 
 const ToolsMovementHistory = () => {
   const [storeLocation, setStoreLocation] = useState<string>('');
   const [movements, setMovements] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [challanDraft, setChallanDraft] = useState<DeliveryChallanOptions | null>(null);
 
   useEffect(() => {
     const fetchMovements = async () => {
@@ -52,6 +56,25 @@ const ToolsMovementHistory = () => {
       );
     });
   }, [movements, search]);
+
+  const downloadChallan = (m: any) => {
+    const isInbound = m.to_site === storeLocation;
+    const tool = m.tool || {};
+    setChallanDraft({
+      type: isInbound ? 'RECEIPT' : 'DISPATCH',
+      consignee: isInbound ? (storeLocation || 'Store') : (m.to_site || 'Site'),
+      date: m.timestamp ? new Date(m.timestamp).toLocaleDateString() : undefined,
+      remarks: m.remarks || '',
+      items: [{
+        description: tool.description,
+        materialCode: tool.item_code,
+        qrCode: tool.qr_code,
+        quantity: '1',
+        unit: 'NOS',
+      }],
+      filename: `${isInbound ? 'Inward' : 'Outward'}_Challan_${tool.qr_code || m.id}_${Date.now()}.pdf`,
+    });
+  };
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20">
@@ -126,6 +149,7 @@ const ToolsMovementHistory = () => {
                     <TableHead>Remarks</TableHead>
                     <TableHead>By</TableHead>
                     <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -155,6 +179,17 @@ const ToolsMovementHistory = () => {
                         <TableCell className="text-sm text-gray-500 whitespace-nowrap">
                           {m.timestamp ? new Date(m.timestamp).toLocaleString() : '-'}
                         </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-[#1E3A8A] hover:bg-blue-50"
+                            title="Download Delivery Challan"
+                            onClick={() => downloadChallan(m)}
+                          >
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -164,6 +199,12 @@ const ToolsMovementHistory = () => {
           )}
         </CardContent>
       </Card>
+
+      <DeliveryChallanPreviewDialog
+        open={!!challanDraft}
+        onOpenChange={(o) => !o && setChallanDraft(null)}
+        initialOptions={challanDraft}
+      />
     </div>
   );
 };
