@@ -77,8 +77,10 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   // --- Logo & Company Header ---
   try {
     const logoData = await getLogoDataUrl();
-    // Logo is ~347x100px (~3.47:1) - keep aspect ratio
-    doc.addImage(logoData, 'PNG', left, 8, 38, 11);
+    // Logo is ~347x100px (~3.47:1) - keep aspect ratio, centered at top
+    const logoWidth = 38;
+    const logoHeight = 11;
+    doc.addImage(logoData, 'PNG', (left + right) / 2 - logoWidth / 2, 8, logoWidth, logoHeight);
   } catch (e) {
     console.warn('Could not load logo for PDF', e);
   }
