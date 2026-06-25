@@ -178,7 +178,9 @@ const UsersManagement = () => {
       if (!newUser.email) missingFields.push("Email");
       if (!newUser.password) missingFields.push("Password");
       if (!newUser.role) missingFields.push("Role");
-      if (!newUser.site) missingFields.push("Site Location");
+      if (!newUser.site && newUser.role !== 'admin' && newUser.role !== 'management') {
+        missingFields.push("Site Location");
+      }
 
       if (missingFields.length > 0) {
         toast.error(`Please fill in: ${missingFields.join(', ')}`);
