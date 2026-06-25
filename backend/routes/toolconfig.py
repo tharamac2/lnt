@@ -4,7 +4,7 @@ from sqlmodel import Session, select
 import pandas as pd
 import io
 from ..database import get_session
-from ..models import ToolConfig, ToolConfigCreate, ToolConfigRead, User, Tool, Alert, Inspection, MovementHistory
+from ..models import ToolConfig, ToolConfigCreate, ToolConfigRead, ToolConfigUpdate, User, Tool, Alert, Inspection, MovementHistory
 from ..auth import get_current_user
 from ..audit import log_action
 from pydantic import BaseModel
@@ -36,12 +36,25 @@ def read_tool_configs(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
+    # Auto-create a stub config (blank item code, pending) for any tool name
+    # that exists in Tool Master but has no Tool Config entry yet, so every
+    # tool name is visible here and can have its item code filled in.
+    existing_names = set(session.exec(select(ToolConfig.tool_name)).all())
+    distinct_tool_names = session.exec(
+        select(Tool.description).where(Tool.is_deleted == False).distinct()
+    ).all()
+    missing_names = [name for name in distinct_tool_names if name and name not in existing_names]
+    if missing_names:
+        for name in missing_names:
+            session.add(ToolConfig(tool_name=name, item_code="", is_verified=False))
+        session.commit()
+
     statement = select(ToolConfig)
     if verified_only:
         statement = statement.where(ToolConfig.is_verified == True)
     statement = statement.order_by(ToolConfig.tool_name.asc())
     configs = session.exec(statement).all()
-    
+
     result = []
     for cfg in configs:
         # Fetch active tools for this configuration
@@ -96,6 +109,44 @@ def create_tool_config(
     log_action(
         session, current_user, "create", "ToolConfig", db_config.id,
         f"Configured tool '{db_config.tool_name}' with item code '{db_config.item_code}' (pending verification)",
+        site=current_user.site,
+    )
+    session.commit()
+
+    return db_config
+
+@router.put("/{config_id}", response_model=ToolConfigRead)
+def update_tool_config(
+    config_id: int,
+    payload: ToolConfigUpdate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized to configure tools")
+
+    db_config = session.get(ToolConfig, config_id)
+    if not db_config:
+        raise HTTPException(status_code=404, detail="Tool configuration not found")
+
+    update_data = payload.dict(exclude_unset=True)
+    item_code_changed = "item_code" in update_data and update_data["item_code"] != db_config.item_code
+
+    if "item_code" in update_data:
+        db_config.item_code = update_data["item_code"]
+    if "tool_name" in update_data:
+        db_config.tool_name = update_data["tool_name"]
+
+    if item_code_changed:
+        db_config.is_verified = False  # Re-verification required after item code change
+
+    session.add(db_config)
+    session.commit()
+    session.refresh(db_config)
+
+    log_action(
+        session, current_user, "update", "ToolConfig", db_config.id,
+        f"Updated tool config '{db_config.tool_name}' item code to '{db_config.item_code}'",
         site=current_user.site,
     )
     session.commit()

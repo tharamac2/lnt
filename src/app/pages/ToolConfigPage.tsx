@@ -5,7 +5,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
-import { Wrench, Sliders, Trash2, Search, PlusCircle, AlertCircle, FileSpreadsheet, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Wrench, Sliders, Trash2, Search, PlusCircle, AlertCircle, FileSpreadsheet, CheckCircle2, ChevronDown, ChevronRight, Pencil, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../services/api';
 
@@ -39,6 +39,9 @@ const ToolConfigPage = () => {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingCode, setEditingCode] = useState('');
+  const [savingCode, setSavingCode] = useState(false);
 
   const fetchConfigs = async () => {
     setLoading(true);
@@ -97,6 +100,36 @@ const ToolConfigPage = () => {
     } catch (error: any) {
       console.error('Failed to delete tool configuration', error);
       toast.error(error.response?.data?.detail || 'Failed to delete tool configuration');
+    }
+  };
+
+  const startEditCode = (config: ToolConfig) => {
+    setEditingId(config.id);
+    setEditingCode(config.item_code);
+  };
+
+  const cancelEditCode = () => {
+    setEditingId(null);
+    setEditingCode('');
+  };
+
+  const saveEditCode = async (id: number) => {
+    if (!editingCode.trim()) {
+      toast.error('Item Code cannot be empty');
+      return;
+    }
+    setSavingCode(true);
+    try {
+      await api.put(`/toolconfig/${id}`, { item_code: editingCode.trim().toUpperCase() });
+      toast.success('Item code updated (Pending Verification)');
+      setEditingId(null);
+      setEditingCode('');
+      fetchConfigs();
+    } catch (error: any) {
+      console.error('Failed to update item code', error);
+      toast.error(error.response?.data?.detail || 'Failed to update item code');
+    } finally {
+      setSavingCode(false);
     }
   };
 
@@ -387,7 +420,37 @@ const ToolConfigPage = () => {
                               </TableCell>
                               <TableCell className="font-medium text-gray-500">{index + 1}</TableCell>
                               <TableCell className="font-semibold text-gray-800">{config.tool_name}</TableCell>
-                              <TableCell className="font-mono text-xs text-blue-600 font-medium">{config.item_code}</TableCell>
+                              <TableCell className="font-mono text-xs text-blue-600 font-medium">
+                                {editingId === config.id ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <Input
+                                      autoFocus
+                                      value={editingCode}
+                                      onChange={(e) => setEditingCode(e.target.value.toUpperCase())}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') saveEditCode(config.id);
+                                        if (e.key === 'Escape') cancelEditCode();
+                                      }}
+                                      className="h-7 w-32 text-xs font-mono"
+                                    />
+                                    <Button size="icon" variant="ghost" className="h-6 w-6 text-emerald-600" disabled={savingCode} onClick={() => saveEditCode(config.id)}>
+                                      <Check className="w-3.5 h-3.5" />
+                                    </Button>
+                                    <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-400" onClick={cancelEditCode}>
+                                      <X className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => startEditCode(config)}
+                                    className="flex items-center gap-1.5 hover:underline underline-offset-2"
+                                    title="Click to edit item code"
+                                  >
+                                    {config.item_code || <span className="text-gray-400 italic">Not set</span>}
+                                    <Pencil className="w-3 h-3 text-gray-400" />
+                                  </button>
+                                )}
+                              </TableCell>
                               <TableCell>
                                 <Badge
                                   variant={config.is_verified ? 'success' : 'warning'}
