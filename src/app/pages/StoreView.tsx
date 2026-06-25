@@ -654,7 +654,7 @@ const StoreView = () => {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Sub-Contractor Code</Label>
+                          <Label>Vendor Code</Label>
                           <Input
                             placeholder="Code"
                             value={formData.subcontractorCode}
@@ -725,9 +725,17 @@ const StoreView = () => {
 
                     {(transactionType === 'out' || inSubCategory === 'site_receive') && (
                       <div className="space-y-2">
-                        <Label>{transactionType === 'out' ? 'Next Store' : 'Origin Site (Optional)'}</Label>
+                        <Label>
+                          {transactionType === 'out'
+                            ? (outSubCategory === 'subcon_work' ? 'Site Code' : 'Next Store')
+                            : 'Origin Site (Optional)'}
+                        </Label>
                         <Input
-                          placeholder="Store Name"
+                          placeholder={
+                            transactionType === 'out'
+                              ? (outSubCategory === 'subcon_work' ? 'Site Code' : 'Store Name')
+                              : 'Site Name'
+                          }
                           value={formData.targetSite}
                           onChange={(e) => setFormData({ ...formData, targetSite: e.target.value })}
                         />
