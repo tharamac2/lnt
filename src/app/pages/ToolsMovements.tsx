@@ -34,6 +34,23 @@ const ToolsMovements = () => {
   const [toolConfigs, setToolConfigs] = useState<{ [key: number]: { status: 'received' | 'pending' | 'missing' | 'unconfigured'; expectedDays: number; reason: string } }>({});
   const [notReturnedTools, setNotReturnedTools] = useState<any[]>([]);
 
+  // Dealers (Sub Contractor / Supplier / Scrap Dealer) for auto-fill dropdowns
+  const [dealers, setDealers] = useState<any[]>([]);
+  useEffect(() => {
+    api.get('/dealers/').then((res) => setDealers(res.data || [])).catch((err) => console.error('Failed to fetch dealers', err));
+  }, []);
+  const dealersByCategory = (category: string) => dealers.filter((d) => d.category === category);
+  const applyBulkDealer = (dealerId: string) => {
+    const dealer = dealers.find((d) => String(d.id) === dealerId);
+    if (!dealer) return;
+    setBulkFormData((prev) => ({
+      ...prev,
+      subcontractorName: dealer.company_name || '',
+      subcontractorCode: dealer.dealer_code || '',
+      subcontractorMobile: dealer.contact_number || '',
+    }));
+  };
+
   useEffect(() => {
     const fetchAndFilterNotReturned = async () => {
       if (bulkActionMode !== 'in' || bulkTools.length === 0) {
@@ -300,7 +317,10 @@ const ToolsMovements = () => {
             payload.subcontractor_code = null;
             payload.remarks = `Returned from Sub-Contractor. ${bulkFormData.remarks}${checklistStr}`;
           } else if (bulkInSubCategory === 'new_product') {
-            payload.remarks = `New Product Received. ${bulkFormData.remarks}${checklistStr}`;
+            const supplierInfo = bulkFormData.subcontractorName
+              ? ` Supplier: ${bulkFormData.subcontractorName}${bulkFormData.subcontractorCode ? ' (' + bulkFormData.subcontractorCode + ')' : ''}.`
+              : '';
+            payload.remarks = `New Product Received.${supplierInfo} ${bulkFormData.remarks}${checklistStr}`;
           } else if (bulkInSubCategory === 'site_receive') {
             payload.remarks = `Received from Site ${tool.current_site}. ${bulkFormData.remarks}${checklistStr}`;
           } else if (bulkInSubCategory === 'found_recovered') {
@@ -666,6 +686,19 @@ const ToolsMovements = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
               {bulkActionMode === 'out' && bulkOutSubCategory === 'subcon_work' && (
                 <>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Select Sub-Contractor (optional)</Label>
+                    <select
+                      defaultValue=""
+                      onChange={(e) => applyBulkDealer(e.target.value)}
+                      className="w-full h-10 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">-- Choose from Dealers list --</option>
+                      {dealersByCategory('sub_contractor').map((d) => (
+                        <option key={d.id} value={d.id}>{d.company_name} ({d.dealer_code})</option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="space-y-2">
                     <Label>Sub-Contractor Name</Label>
                     <Input
@@ -702,6 +735,19 @@ const ToolsMovements = () => {
 
               {bulkActionMode === 'out' && bulkOutSubCategory === 'scrap_disposal' && (
                 <>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Select Scrap Dealer (optional)</Label>
+                    <select
+                      defaultValue=""
+                      onChange={(e) => applyBulkDealer(e.target.value)}
+                      className="w-full h-10 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">-- Choose from Dealers list --</option>
+                      {dealersByCategory('scrap_dealer').map((d) => (
+                        <option key={d.id} value={d.id}>{d.company_name} ({d.dealer_code})</option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="space-y-2">
                     <Label>Scrap Dealer Name</Label>
                     <Input
@@ -731,6 +777,40 @@ const ToolsMovements = () => {
                         setBulkFormData({ ...bulkFormData, subcontractorMobile: val });
                         setBulkMobileError(val && val.length !== 10 ? 'Must be 10 digits' : '');
                       }}
+                    />
+                  </div>
+                </>
+              )}
+
+              {bulkActionMode === 'in' && bulkInSubCategory === 'new_product' && (
+                <>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Select Supplier (optional)</Label>
+                    <select
+                      defaultValue=""
+                      onChange={(e) => applyBulkDealer(e.target.value)}
+                      className="w-full h-10 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">-- Choose from Dealers list --</option>
+                      {dealersByCategory('supplier').map((d) => (
+                        <option key={d.id} value={d.id}>{d.company_name} ({d.dealer_code})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Supplier Name</Label>
+                    <Input
+                      placeholder="Name"
+                      value={bulkFormData.subcontractorName}
+                      onChange={(e) => setBulkFormData({ ...bulkFormData, subcontractorName: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Supplier Code</Label>
+                    <Input
+                      placeholder="Code"
+                      value={bulkFormData.subcontractorCode}
+                      onChange={(e) => setBulkFormData({ ...bulkFormData, subcontractorCode: e.target.value })}
                     />
                   </div>
                 </>

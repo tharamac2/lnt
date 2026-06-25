@@ -63,6 +63,23 @@ const StoreView = () => {
   // Last Transaction
   const [lastTransaction, setLastTransaction] = useState<any>(null);
 
+  // Dealers (Sub Contractor / Supplier / Scrap Dealer) for auto-fill dropdowns
+  const [dealers, setDealers] = useState<any[]>([]);
+  useEffect(() => {
+    api.get('/dealers/').then((res) => setDealers(res.data || [])).catch((err) => console.error('Failed to fetch dealers', err));
+  }, []);
+  const dealersByCategory = (category: string) => dealers.filter((d) => d.category === category);
+  const applyDealer = (dealerId: string) => {
+    const dealer = dealers.find((d) => String(d.id) === dealerId);
+    if (!dealer) return;
+    setFormData((prev) => ({
+      ...prev,
+      subcontractorName: dealer.company_name || '',
+      subcontractorCode: dealer.dealer_code || '',
+      subcontractorMobile: dealer.contact_number || '',
+    }));
+  };
+
   // Delivery Challan Preview/Edit Dialog
   const [challanDraft, setChallanDraft] = useState<DeliveryChallanOptions | null>(null);
 
@@ -277,7 +294,10 @@ const StoreView = () => {
           payload.subcontractor_code = null;
           payload.remarks = `Returned from Sub-Contractor. ${formData.remarks}`;
         } else if (inSubCategory === 'new_product') {
-          payload.remarks = `New Product Received. ${formData.remarks}`;
+          const supplierInfo = formData.subcontractorName
+            ? ` Supplier: ${formData.subcontractorName}${formData.subcontractorCode ? ' (' + formData.subcontractorCode + ')' : ''}.`
+            : '';
+          payload.remarks = `New Product Received.${supplierInfo} ${formData.remarks}`;
         } else if (inSubCategory === 'site_receive') {
           payload.remarks = `Received from Site ${scannedTool.current_site}. ${formData.remarks}`;
         } else if (inSubCategory === 'found_recovered') {
@@ -645,6 +665,19 @@ const StoreView = () => {
                     {/* Fields dynamic based on selection */}
                     {(transactionType === 'out' && outSubCategory === 'subcon_work') && (
                       <>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label>Select Sub-Contractor (optional)</Label>
+                          <select
+                            defaultValue=""
+                            onChange={(e) => applyDealer(e.target.value)}
+                            className="w-full h-10 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          >
+                            <option value="">-- Choose from Dealers list --</option>
+                            {dealersByCategory('sub_contractor').map((d) => (
+                              <option key={d.id} value={d.id}>{d.company_name} ({d.dealer_code})</option>
+                            ))}
+                          </select>
+                        </div>
                         <div className="space-y-2">
                           <Label>Sub-Contractor Name</Label>
                           <Input
@@ -685,6 +718,19 @@ const StoreView = () => {
 
                     {(transactionType === 'out' && outSubCategory === 'scrap_disposal') && (
                       <>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label>Select Scrap Dealer (optional)</Label>
+                          <select
+                            defaultValue=""
+                            onChange={(e) => applyDealer(e.target.value)}
+                            className="w-full h-10 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          >
+                            <option value="">-- Choose from Dealers list --</option>
+                            {dealersByCategory('scrap_dealer').map((d) => (
+                              <option key={d.id} value={d.id}>{d.company_name} ({d.dealer_code})</option>
+                            ))}
+                          </select>
+                        </div>
                         <div className="space-y-2">
                           <Label>Scrap Dealer Name</Label>
                           <Input
@@ -718,6 +764,40 @@ const StoreView = () => {
                                 setMobileError('');
                               }
                             }}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {(transactionType === 'in' && inSubCategory === 'new_product') && (
+                      <>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label>Select Supplier (optional)</Label>
+                          <select
+                            defaultValue=""
+                            onChange={(e) => applyDealer(e.target.value)}
+                            className="w-full h-10 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          >
+                            <option value="">-- Choose from Dealers list --</option>
+                            {dealersByCategory('supplier').map((d) => (
+                              <option key={d.id} value={d.id}>{d.company_name} ({d.dealer_code})</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Supplier Name</Label>
+                          <Input
+                            placeholder="Name"
+                            value={formData.subcontractorName}
+                            onChange={(e) => setFormData({ ...formData, subcontractorName: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Supplier Code</Label>
+                          <Input
+                            placeholder="Code"
+                            value={formData.subcontractorCode}
+                            onChange={(e) => setFormData({ ...formData, subcontractorCode: e.target.value })}
                           />
                         </div>
                       </>
