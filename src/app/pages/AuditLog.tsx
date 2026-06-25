@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
-import { ScrollText, Search, X, Plus, Pencil, Trash2, LogIn, ArrowLeftRight, ClipboardCheck } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { ScrollText, Search, X, Plus, Pencil, Trash2, LogIn, ArrowLeftRight, ClipboardCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '../services/api';
 import {
   Table,
@@ -42,10 +43,13 @@ const getActionBadge = (action: string) => {
   );
 };
 
+const LOGS_PER_PAGE = 50;
+
 const AuditLogPage = () => {
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -74,6 +78,16 @@ const AuditLogPage = () => {
       );
     });
   }, [logs, search]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / LOGS_PER_PAGE));
+  const pagedLogs = useMemo(() => {
+    const start = (currentPage - 1) * LOGS_PER_PAGE;
+    return filteredLogs.slice(start, start + LOGS_PER_PAGE);
+  }, [filteredLogs, currentPage]);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20">
@@ -149,7 +163,7 @@ const AuditLogPage = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredLogs.map((log) => (
+                  {pagedLogs.map((log) => (
                     <TableRow key={log.id} className="hover:bg-blue-50/20">
                       <TableCell className="text-sm text-gray-500 whitespace-nowrap">
                         {log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}
@@ -167,6 +181,38 @@ const AuditLogPage = () => {
             </div>
           )}
         </CardContent>
+
+        {filteredLogs.length > 0 && (
+          <div className="flex items-center justify-between gap-4 p-3 border-t border-gray-100">
+            <p className="text-sm text-gray-500">
+              Showing {(currentPage - 1) * LOGS_PER_PAGE + 1}-
+              {Math.min(currentPage * LOGS_PER_PAGE, filteredLogs.length)} of {filteredLogs.length}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Previous
+              </Button>
+              <span className="text-sm text-gray-600 px-2">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );

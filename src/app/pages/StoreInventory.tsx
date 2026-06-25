@@ -405,7 +405,6 @@ const StoreInventory = () => {
                 <SelectItem value="usable">Usable</SelectItem>
                 <SelectItem value="under-repair">Under Repair</SelectItem>
                 <SelectItem value="scrap">Scrap</SelectItem>
-                <SelectItem value="scrapped">Scrapped</SelectItem>
                 <SelectItem value="missing">Missing</SelectItem>
                 <SelectItem value="stolen">Stolen</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
