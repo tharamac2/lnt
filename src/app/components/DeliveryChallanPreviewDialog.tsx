@@ -28,6 +28,9 @@ interface DeliveryChallanPreviewDialogProps {
 
 type EditableFields = Omit<DeliveryChallanOptions, 'type' | 'items' | 'filename' | 'copyDistribution'>;
 
+// Copy Distribution checkboxes are always shown unchecked in the generated PDF
+const EMPTY_COPY_DISTRIBUTION: string[] = [];
+
 const emptyFields: EditableFields = {
   consignee: '',
   siteCode: '',
@@ -63,8 +66,7 @@ const DeliveryChallanPreviewDialog = ({
 }: DeliveryChallanPreviewDialogProps) => {
   const [fields, setFields] = useState<EditableFields>(emptyFields);
   const [items, setItems] = useState<DeliveryChallanItem[]>([]);
-  // Copy Distribution checkboxes are always shown unchecked in the generated PDF
-  const copyDistribution: string[] = [];
+  const copyDistribution = EMPTY_COPY_DISTRIBUTION;
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
