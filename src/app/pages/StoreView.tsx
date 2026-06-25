@@ -31,6 +31,9 @@ const StoreView = () => {
   const [scannedTool, setScannedTool] = useState<any>(null);
   const [scanning, setScanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [manualSearchQuery, setManualSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const searchTimeoutRef = useRef<any>(null);
 
   // Transaction State
   const [transactionType, setTransactionType] = useState<'in' | 'out'>('in');
@@ -74,6 +77,26 @@ const StoreView = () => {
       default: return 'bg-gray-100 text-gray-700';
     }
   };
+
+  const handleManualSearchChange = async (query: string) => {
+    setManualSearchQuery(query);
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await api.get(`/tools/?search=${encodeURIComponent(query)}`);
+        setSearchResults(res.data || []);
+      } catch (err) {
+        console.error("Failed to search tools", err);
+      }
+    }, 300);
+  };
+
   const refreshStoreLocation = async () => {
     try {
       const userRes = await api.get('/users/me');
@@ -95,6 +118,23 @@ const StoreView = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
+
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setSearchResults([]);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const triggerScan = () => {
     fileInputRef.current?.click();
@@ -384,7 +424,40 @@ const StoreView = () => {
           </div>
           
           {/* Dev Manual Input */}
-          <Input placeholder="Manual QR Entry" className="w-40 h-8 text-sm" onKeyDown={(e) => { if (e.key === 'Enter') { fetchToolDetails(e.currentTarget.value); e.currentTarget.value = ''; } }} />
+          <div ref={searchContainerRef} className="relative w-80">
+            <Input
+              placeholder="Manual QR Entry (Search or Scan)"
+              className="w-full h-9 text-sm"
+              value={manualSearchQuery}
+              onChange={(e) => handleManualSearchChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && manualSearchQuery.trim()) {
+                  fetchToolDetails(manualSearchQuery.trim());
+                  setManualSearchQuery('');
+                  setSearchResults([]);
+                }
+              }}
+            />
+            {searchResults.length > 0 && (
+              <div className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg z-50 divide-y divide-gray-100 text-left">
+                {searchResults.map((tool) => (
+                  <button
+                    key={tool.id}
+                    type="button"
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-blue-50 transition-colors flex flex-col gap-0.5"
+                    onClick={() => {
+                      fetchToolDetails(tool.qr_code);
+                      setManualSearchQuery('');
+                      setSearchResults([]);
+                    }}
+                  >
+                    <span className="font-medium text-gray-900">{tool.description}</span>
+                    <span className="text-xs text-gray-500">QR: {tool.qr_code} | Site: {tool.current_site || 'None'}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
