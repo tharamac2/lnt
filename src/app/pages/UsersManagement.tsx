@@ -385,8 +385,11 @@ const UsersManagement = () => {
     switch (role.toLowerCase()) {
       case 'admin':
         return <Badge className="bg-purple-600">Admin</Badge>;
+      case 'management':
+        return <Badge className="bg-amber-600">Management</Badge>;
       case 'inspector':
         return <Badge className="bg-blue-600">Inspector</Badge>;
+      case 'store':
       case 'store manager':
         return <Badge className="bg-green-600">Store Manager</Badge>;
       case 'worker':
@@ -540,6 +543,7 @@ const UsersManagement = () => {
                     <SelectItem value="store">Store Manager</SelectItem>
                     <SelectItem value="worker">Worker</SelectItem>
                     <SelectItem value="data_entry">Data Entry</SelectItem>
+                    <SelectItem value="management">Management</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -558,6 +562,13 @@ const UsersManagement = () => {
                     required
                   />
                   <p className="text-xs text-gray-500">This will create a new store and add it to the location list.</p>
+                </div>
+              ) : newUser.role === 'management' ? (
+                <div className="space-y-2">
+                  <Label>Store Location</Label>
+                  <p className="text-xs text-gray-500 border border-gray-100 bg-gray-50 rounded px-2.5 py-2">
+                    Global oversight. No store assignment needed.
+                  </p>
                 </div>
               ) : newUser.role && ['worker', 'inspector', 'data_entry'].includes(newUser.role) ? (
                 <div className="space-y-2">
@@ -662,6 +673,7 @@ const UsersManagement = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="management">Management</SelectItem>
                     <SelectItem value="inspector">Inspector</SelectItem>
                     <SelectItem value="store">Store Manager</SelectItem>
                     <SelectItem value="worker">Worker</SelectItem>
@@ -671,7 +683,11 @@ const UsersManagement = () => {
               </div>
               <div className="space-y-2">
                 <Label>Site Location</Label>
-                {editFormData.role === 'store' ? (
+                {['admin', 'management'].includes(editFormData.role) ? (
+                  <p className="text-xs text-gray-500 border border-gray-100 bg-gray-50 rounded px-2.5 py-2">
+                    Global oversight. No store assignment needed.
+                  </p>
+                ) : editFormData.role === 'store' ? (
                   <Input
                     placeholder="Store / location name"
                     value={editFormData.site}
