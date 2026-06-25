@@ -654,7 +654,7 @@ const StoreView = () => {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Sub-Contractor Code</Label>
+                          <Label>Vendor Code</Label>
                           <Input
                             placeholder="Code"
                             value={formData.subcontractorCode}
