@@ -217,7 +217,7 @@ const DeliveryChallanPreviewDialog = ({
                 <Input value={fields.consignee} onChange={(e) => setField('consignee', e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label>Consignee / Site Code</Label>
+                <Label>Site Code</Label>
                 <Input value={fields.siteCode} onChange={(e) => setField('siteCode', e.target.value)} />
               </div>
               <div className="space-y-1.5 col-span-2">
