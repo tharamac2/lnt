@@ -187,7 +187,7 @@ const StoreView = () => {
         setIncidentDebitTo('');
       }
 
-      // Sub-Contractor Return is only valid for tools currently dispatched to a sub-contractor
+      // Sub-Contractor Return is only valid for tools currently despatched to a sub-contractor
       setInSubCategory(res.data.subcontractor_name ? 'subcon_return' : 'new_product');
 
       toast.success("Tool details loaded");
@@ -199,12 +199,12 @@ const StoreView = () => {
 
 
 
-  const generatePDF = (tool: any, transactionDetails: string, remarks: string, type: 'RECEIPT' | 'DISPATCH' = 'RECEIPT') => {
+  const generatePDF = (tool: any, transactionDetails: string, remarks: string, type: 'RECEIPT' | 'DESPATCH' = 'RECEIPT') => {
     let consignee = storeLocation;
     let siteCode: string | undefined;
     let vendorCode: string | undefined;
 
-    if (type === 'DISPATCH') {
+    if (type === 'DESPATCH') {
       if (transactionDetails === 'subcon_work') {
         consignee = tool.subcontractor_name || 'Sub-Contractor';
         siteCode = tool.current_site || undefined;
@@ -291,7 +291,7 @@ const StoreView = () => {
           payload.remarks = `Tool Found/Recovered. Previous status: ${scannedTool.status}. ${formData.remarks}`;
         }
       } else {
-        // DISPATCH LOGIC
+        // DESPATCH LOGIC
         if (outSubCategory === 'subcon_work') {
           payload.current_site = formData.targetSite || scannedTool.current_site; // Optional update site
           payload.subcontractor_name = formData.subcontractorName;
@@ -319,20 +319,20 @@ const StoreView = () => {
 
       await api.patch(`/tools/${scannedTool.id}`, payload);
       setLastTransaction({
-        type: transactionType === 'in' ? 'RECEIPT' : 'DISPATCH',
+        type: transactionType === 'in' ? 'RECEIPT' : 'DESPATCH',
         details: transactionType === 'in' ? inSubCategory : outSubCategory,
         remarks: payload.remarks,
         timestamp: new Date().toLocaleString()
       });
       toast.success("Transaction recorded successfully");
 
-      // Generate PDF for both Receipt and Dispatch
+      // Generate PDF for both Receipt and Despatch
       setTimeout(() => {
         generatePDF(
           { ...scannedTool, ...payload },
           transactionType === 'in' ? inSubCategory : outSubCategory,
           payload.remarks,
-          transactionType === 'in' ? 'RECEIPT' : 'DISPATCH'
+          transactionType === 'in' ? 'RECEIPT' : 'DESPATCH'
         );
       }, 500);
 
@@ -402,7 +402,7 @@ const StoreView = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold text-[#0F172A]">Store Operations</h1>
-          <p className="text-gray-500 mt-1">Receipts, Dispatches, and Incident Reporting</p>
+          <p className="text-gray-500 mt-1">Receipts, Despatches, and Incident Reporting</p>
         </div>
 
       </div>
@@ -579,7 +579,7 @@ const StoreView = () => {
                       className={`flex-1 gap-2 ${transactionType === 'out' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
                       onClick={() => setTransactionType('out')}
                     >
-                      <ArrowUpCircle className="w-4 h-4" /> Dispatch (OUT)
+                      <ArrowUpCircle className="w-4 h-4" /> Despatch (OUT)
                     </Button>
                   </div>
                 </CardHeader>
@@ -626,7 +626,7 @@ const StoreView = () => {
 
                   {transactionType === 'out' && (
                     <div className="space-y-4 animate-in slide-in-from-right-2">
-                      <Label>Dispatch Type</Label>
+                      <Label>Despatch Type</Label>
                       <RadioGroup value={outSubCategory} onValueChange={setOutSubCategory} className="grid grid-cols-1 md:grid-cols-3 gap-2">
                         <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-gray-50">
                           <RadioGroupItem value="subcon_work" id="d1" />
@@ -757,7 +757,7 @@ const StoreView = () => {
 
                   <Button className="w-full bg-[#1E3A8A]" onClick={handleSubmit}>
                     <Save className="w-4 h-4 mr-2" />
-                    Confirm {transactionType === 'in' ? 'Receipt' : 'Dispatch'}
+                    Confirm {transactionType === 'in' ? 'Receipt' : 'Despatch'}
                   </Button>
 
                   {lastTransaction && (
@@ -783,7 +783,7 @@ const StoreView = () => {
                             onClick={() => generatePDF(scannedTool, lastTransaction.details, lastTransaction.remarks, lastTransaction.type)}
                           >
                             <ArrowDownCircle className="w-4 h-4 mr-2" />
-                            Download {lastTransaction.type === 'RECEIPT' ? 'Receipt' : 'Dispatch'} Note
+                            Download {lastTransaction.type === 'RECEIPT' ? 'Receipt' : 'Despatch'} Note
                           </Button>
                         )}
                       </div>

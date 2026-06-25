@@ -150,7 +150,7 @@ const ToolsMovements = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sub-Contractor Return is only valid for tools currently dispatched to a sub-contractor
+  // Sub-Contractor Return is only valid for tools currently despatched to a sub-contractor
   const allSelectedHaveSubcontractor = bulkTools.length > 0 &&
     bulkTools.every((tool) => !!tool.subcontractor_name);
   // Found/Recovered is only valid for tools currently reported missing/stolen
@@ -171,12 +171,12 @@ const ToolsMovements = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bulkActionMode]);
 
-  const generateBulkPDF = (tools: any[], transactionDetails: string, remarks: string, type: 'RECEIPT' | 'DISPATCH') => {
+  const generateBulkPDF = (tools: any[], transactionDetails: string, remarks: string, type: 'RECEIPT' | 'DESPATCH') => {
     let consignee = storeLocation;
     let siteCode: string | undefined;
     let vendorCode: string | undefined;
 
-    if (type === 'DISPATCH') {
+    if (type === 'DESPATCH') {
       if (transactionDetails === 'subcon_work') {
         consignee = bulkFormData.subcontractorName || 'Sub-Contractor';
         siteCode = bulkFormData.targetSite || undefined;
@@ -364,10 +364,10 @@ const ToolsMovements = () => {
         }
       }
 
-      toast.success(`Bulk ${bulkActionMode === 'in' ? 'Receipt' : 'Dispatch'} recorded for ${toolsToProcess.length} item(s)`);
+      toast.success(`Bulk ${bulkActionMode === 'in' ? 'Receipt' : 'Despatch'} recorded for ${toolsToProcess.length} item(s)`);
 
       const transactionDetails = bulkActionMode === 'in' ? bulkInSubCategory : bulkOutSubCategory;
-      const pdfType = bulkActionMode === 'in' ? 'RECEIPT' : 'DISPATCH';
+      const pdfType = bulkActionMode === 'in' ? 'RECEIPT' : 'DESPATCH';
       const pdfRemarks = bulkFormData.remarks ? `${bulkFormData.remarks}${checklistStr}` : checklistStr.trim();
       const toolsToPrint = pdfType === 'RECEIPT'
         ? updatedTools.filter(t => t.status === 'usable')
@@ -393,7 +393,7 @@ const ToolsMovements = () => {
         <div>
           <h1 className="text-3xl font-semibold text-[#0F172A]">Tools Movements</h1>
           <p className="text-gray-500 mt-1">
-            Perform bulk Receipt (IN) / Dispatch (OUT) transactions for {storeLocation || 'your site'}
+            Perform bulk Receipt (IN) / Despatch (OUT) transactions for {storeLocation || 'your site'}
           </p>
         </div>
         <Button variant="outline" onClick={() => navigate('/tools-movement-history')}>
@@ -406,7 +406,7 @@ const ToolsMovements = () => {
         <Card>
           <CardContent className="p-8 text-center text-gray-400 flex flex-col items-center">
             <Truck className="w-12 h-12 text-gray-200 mb-2" />
-            <p>Select tools from Store Inventory and choose Receipt (IN) or Dispatch (OUT) to start a bulk transaction here.</p>
+            <p>Select tools from Store Inventory and choose Receipt (IN) or Despatch (OUT) to start a bulk transaction here.</p>
             <Button className="mt-4 bg-[#1E3A8A]" onClick={() => navigate('/store-inventory')}>
               Go to Store Inventory
             </Button>
@@ -420,7 +420,7 @@ const ToolsMovements = () => {
           <CardHeader className="bg-gray-50 pb-2">
             <CardTitle className="text-xl flex items-center gap-2">
               {bulkActionMode === 'in' ? <ArrowDownCircle className="text-green-600 w-5 h-5" /> : <ArrowUpCircle className="text-blue-600 w-5 h-5" />}
-              Bulk {bulkActionMode === 'in' ? 'Receipt (IN)' : 'Dispatch (OUT)'}
+              Bulk {bulkActionMode === 'in' ? 'Receipt (IN)' : 'Despatch (OUT)'}
               <Badge variant="outline">{bulkTools.length} item{bulkTools.length === 1 ? '' : 's'}</Badge>
             </CardTitle>
             <CardDescription>
@@ -641,7 +641,7 @@ const ToolsMovements = () => {
 
             {bulkActionMode === 'out' && (
               <div className="space-y-4 animate-in slide-in-from-right-2">
-                <Label>Dispatch Type</Label>
+                <Label>Despatch Type</Label>
                 <RadioGroup value={bulkOutSubCategory} onValueChange={setBulkOutSubCategory} className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-gray-50">
                     <RadioGroupItem value="subcon_work" id="bd1" />
@@ -658,10 +658,10 @@ const ToolsMovements = () => {
                 </RadioGroup>
 
                 <p className="text-xs text-gray-500">
-                  * Note: Dispatches to Sub-Contractor / Site will automatically filter and only transfer <strong>usable (working condition)</strong> tools.
+                  * Note: Despatches to Sub-Contractor / Site will automatically filter and only transfer <strong>usable (working condition)</strong> tools.
                 </p>
                 <p className="text-xs text-red-600">
-                  * Note: Dispatches to Scrap Dealer will automatically filter and only transfer <strong>scrap</strong> tools.
+                  * Note: Despatches to Scrap Dealer will automatically filter and only transfer <strong>scrap</strong> tools.
                 </p>
               </div>
             )}
@@ -980,7 +980,7 @@ const ToolsMovements = () => {
             <div className="flex gap-3">
               <Button className="flex-1 bg-[#1E3A8A]" onClick={handleBulkSubmit} disabled={bulkSubmitting}>
                 <Save className="w-4 h-4 mr-2" />
-                {bulkSubmitting ? 'Processing...' : `Confirm Bulk ${bulkActionMode === 'in' ? 'Receipt' : 'Dispatch'} (${bulkTools.length})`}
+                {bulkSubmitting ? 'Processing...' : `Confirm Bulk ${bulkActionMode === 'in' ? 'Receipt' : 'Despatch'} (${bulkTools.length})`}
               </Button>
               <Button variant="outline" onClick={cancelBulkTransaction} disabled={bulkSubmitting}>
                 Cancel

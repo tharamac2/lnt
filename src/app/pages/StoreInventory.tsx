@@ -445,7 +445,7 @@ const StoreInventory = () => {
                 onClick={() => goToMovements('out')}
               >
                 <ArrowUpCircle className="w-3.5 h-3.5 mr-1.5" />
-                Dispatch (OUT)
+                Despatch (OUT)
               </Button>
               <Button size="sm" variant="outline" className="h-8 bg-white" onClick={exportSelectedInventoryPDF}>
                 <Download className="w-3.5 h-3.5 mr-1.5" />

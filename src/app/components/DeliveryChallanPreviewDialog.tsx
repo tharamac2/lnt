@@ -193,7 +193,7 @@ const DeliveryChallanPreviewDialog = ({
       <DialogContent className="sm:max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            Preview & Edit {initialOptions.type === 'RECEIPT' ? 'Receipt' : 'Dispatch'} Delivery Challan
+            Preview & Edit {initialOptions.type === 'RECEIPT' ? 'Receipt' : 'Despatch'} Delivery Challan
           </DialogTitle>
           <DialogDescription>
             Edit any field below — the preview updates automatically. Download when ready.

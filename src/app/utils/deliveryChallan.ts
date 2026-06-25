@@ -12,7 +12,7 @@ export interface DeliveryChallanItem {
 }
 
 export interface DeliveryChallanOptions {
-  type: 'RECEIPT' | 'DISPATCH';
+  type: 'RECEIPT' | 'DESPATCH';
   consignee: string;
   siteCode?: string;
   date?: string;
@@ -184,7 +184,7 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   // --- Instruction line ---
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(9);
-  const instruction = type === 'DISPATCH'
+  const instruction = type === 'DESPATCH'
     ? 'We have despatched the following goods. Kindly return the duplicate copy duly signed acknowledging receipt of goods'
     : 'We have received the following goods. Kindly acknowledge receipt by signing the duplicate copy';
   doc.text(instruction, (left + right) / 2, ewayBoxBottom + 6, { align: 'center', maxWidth: width - 4 });
