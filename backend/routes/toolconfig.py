@@ -131,6 +131,7 @@ def update_tool_config(
 
     update_data = payload.dict(exclude_unset=True)
     item_code_changed = "item_code" in update_data and update_data["item_code"] != db_config.item_code
+    old_tool_name = db_config.tool_name
 
     if "item_code" in update_data:
         db_config.item_code = update_data["item_code"]
@@ -143,6 +144,15 @@ def update_tool_config(
     session.add(db_config)
     session.commit()
     session.refresh(db_config)
+
+    # Keep matching Tool Master records in sync with this config's item code
+    if item_code_changed and db_config.item_code:
+        matching_tools = session.exec(select(Tool).where(Tool.description == old_tool_name)).all()
+        for t in matching_tools:
+            t.item_code = db_config.item_code
+            session.add(t)
+        if matching_tools:
+            session.commit()
 
     log_action(
         session, current_user, "update", "ToolConfig", db_config.id,
@@ -246,6 +256,12 @@ async def bulk_import_tool_configs(
             new_config = ToolConfig(tool_name=tool_name, item_code=item_code, is_verified=False)
             session.add(new_config)
             success_count += 1
+
+        # Keep matching Tool Master records in sync with this item code
+        matching_tools = session.exec(select(Tool).where(Tool.description == tool_name)).all()
+        for t in matching_tools:
+            t.item_code = item_code
+            session.add(t)
 
     session.commit()
 
