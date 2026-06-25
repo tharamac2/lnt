@@ -227,7 +227,7 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   doc.line(left + gatePassWidth, y, left + gatePassWidth, y + 14);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
-  doc.text('GATE PASS COPY APPROVED BY', left + gatePassWidth - 2, y + 6, { align: 'right' });
+  doc.text('GATE PASS COPY APPROVED BY', left + 2, y + 6);
   doc.text('TOTAL', left + gatePassWidth + 3, y + 6);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
