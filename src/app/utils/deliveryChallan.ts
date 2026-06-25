@@ -100,15 +100,17 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
 
   doc.setLineWidth(0.3);
   doc.rect(left, box1Top, width, box1Height);
-  doc.line(leftColRight, box1Top, leftColRight, box1Bottom); // vertical divider
+  doc.line(leftColRight, box1Top, leftColRight, box1Bottom); // vertical divider (full height, both columns)
 
-  // Left column: title + M.R.C NO / DATE
+  const subRowY = box1Top + 19;
+  doc.line(left, subRowY, right, subRowY); // single continuous horizontal divider across both columns
+
+  // Left column top: title
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(17);
   doc.text('DELIVERY CHALLAN', left + leftColWidth / 2, box1Top + 12, { align: 'center' });
 
-  const subRowY = box1Top + 19;
-  doc.line(left, subRowY, leftColRight, subRowY); // horizontal divider
+  // Left column bottom: DC NO. | DATE
   const leftSubColRight = left + leftColWidth / 2;
   doc.line(leftSubColRight, subRowY, leftSubColRight, box1Bottom); // vertical divider
 
@@ -120,7 +122,7 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   doc.text(dcNo || '-', left + 2, subRowY + 11);
   doc.text(date || new Date().toLocaleDateString(), leftSubColRight + 2, subRowY + 11);
 
-  // Right column: Consignee
+  // Right column top: Consignee
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.text('CONSIGNEE', leftColRight + 2, box1Top + 5);
@@ -128,15 +130,13 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   doc.setFontSize(10);
   doc.text(consignee || '-', leftColRight + 2, box1Top + 11, { maxWidth: width - leftColWidth - 4 });
 
-  const rightSubRowY = box1Bottom - 6;
-  doc.line(leftColRight, rightSubRowY, right, rightSubRowY); // horizontal divider
+  // Right column bottom: Consignee / Site Code No. (same row height as DC NO. / DATE)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text('CONSIGNEE / SITE CODE NO.', leftColRight + 2, rightSubRowY + 4);
+  doc.text('CONSIGNEE / SITE CODE NO.', leftColRight + 2, subRowY + 5);
   doc.setFont('helvetica', 'normal');
-  if (siteCode) {
-    doc.text(siteCode, leftColRight + 55, rightSubRowY + 4);
-  }
+  doc.setFontSize(10);
+  if (siteCode) doc.text(siteCode, leftColRight + 2, subRowY + 11, { maxWidth: width - leftColWidth - 4 });
 
   // --- Box 2: TRN CD / Codes Row ---
   const box2Top = box1Bottom;
