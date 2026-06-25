@@ -194,6 +194,7 @@ const ToolsMovements = () => {
       remarks,
       items: tools.map((tool) => ({
         description: tool.description,
+        materialCode: tool.item_code,
         qrCode: tool.qr_code,
         quantity: '1',
         unit: 'NOS',

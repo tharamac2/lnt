@@ -4,6 +4,7 @@ import ltLogo from '../../assets/lt-logo.png';
 
 export interface DeliveryChallanItem {
   description: string;
+  materialCode?: string;
   qrCode?: string;
   quantity?: string | number;
   unit?: string;
@@ -194,9 +195,10 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   autoTable(doc, {
     startY: cursorY,
     margin: { left, right: 210 - right },
-    head: [['SL.\nNO.', 'DESCRIPTION', 'QUANTITY', 'UNIT', 'RATE\nRS.']],
+    head: [['SL.\nNO.', 'MATERIAL\nCODE', 'DESCRIPTION', 'QUANTITY', 'UNIT', 'RATE\nRS.']],
     body: items.map((item, idx) => [
       String(idx + 1),
+      item.materialCode ?? '',
       item.qrCode ? `${item.description}\nQR: ${item.qrCode}` : item.description,
       String(item.quantity ?? '1'),
       item.unit ?? 'NOS',
@@ -206,11 +208,12 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
     styles: { fontSize: 9, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.3 },
     headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center', lineWidth: 0.3 },
     columnStyles: {
-      0: { cellWidth: 14, halign: 'center' },
-      1: { cellWidth: 96 },
-      2: { cellWidth: 26, halign: 'center' },
-      3: { cellWidth: 22, halign: 'center' },
-      4: { cellWidth: 24, halign: 'center' },
+      0: { cellWidth: 12, halign: 'center' },
+      1: { cellWidth: 26, halign: 'center' },
+      2: { cellWidth: 78 },
+      3: { cellWidth: 24, halign: 'center' },
+      4: { cellWidth: 20, halign: 'center' },
+      5: { cellWidth: 22, halign: 'center' },
     },
   });
 

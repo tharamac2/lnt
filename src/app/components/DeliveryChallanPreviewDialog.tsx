@@ -270,13 +270,19 @@ const DeliveryChallanPreviewDialog = ({
                 {items.map((item, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-2 border rounded-md p-2 items-center">
                     <Input
-                      className="col-span-5"
+                      className="col-span-4"
                       placeholder="Description"
                       value={item.description}
                       onChange={(e) => updateItem(idx, 'description', e.target.value)}
                     />
                     <Input
                       className="col-span-2"
+                      placeholder="Material Code"
+                      value={item.materialCode ?? ''}
+                      onChange={(e) => updateItem(idx, 'materialCode', e.target.value)}
+                    />
+                    <Input
+                      className="col-span-1"
                       placeholder="Qty"
                       value={String(item.quantity ?? '')}
                       onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
