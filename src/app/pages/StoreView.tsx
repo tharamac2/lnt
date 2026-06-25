@@ -222,6 +222,7 @@ const StoreView = () => {
       remarks,
       items: [{
         description: tool.description,
+        materialCode: tool.item_code,
         qrCode: tool.qr_code,
         quantity: '1',
         unit: 'NOS',

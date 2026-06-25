@@ -4,6 +4,7 @@ import ltLogo from '../../assets/lt-logo.png';
 
 export interface DeliveryChallanItem {
   description: string;
+  materialCode?: string;
   qrCode?: string;
   quantity?: string | number;
   unit?: string;
@@ -36,6 +37,8 @@ export interface DeliveryChallanOptions {
   freightPaid?: string;
   receiptRmnNo?: string;
   receiptDate?: string;
+  driverName?: string;
+  driverMobile?: string;
   copyDistribution?: string[];
 }
 
@@ -63,6 +66,7 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
     dcNo, trnCd, sendingCentreCode, mrNo, mrDate, stockType, vendorCode, ewayBillNo,
     gatePassApprovedBy, totalAmount, consignorSalesTax, consigneeSalesTax,
     vehicleDetails, lrNo, freightToPay, freightPaid, receiptRmnNo, receiptDate,
+    driverName, driverMobile,
     copyDistribution,
   } = options;
   const doc = new jsPDF();
@@ -74,8 +78,10 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   // --- Logo & Company Header ---
   try {
     const logoData = await getLogoDataUrl();
-    // Logo is ~347x100px (~3.47:1) - keep aspect ratio
-    doc.addImage(logoData, 'PNG', left, 8, 38, 11);
+    // Logo is ~347x100px (~3.47:1) - keep aspect ratio, centered at top
+    const logoWidth = 38;
+    const logoHeight = 11;
+    doc.addImage(logoData, 'PNG', (left + right) / 2 - logoWidth / 2, 8, logoWidth, logoHeight);
   } catch (e) {
     console.warn('Could not load logo for PDF', e);
   }
@@ -97,15 +103,17 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
 
   doc.setLineWidth(0.3);
   doc.rect(left, box1Top, width, box1Height);
-  doc.line(leftColRight, box1Top, leftColRight, box1Bottom); // vertical divider
+  doc.line(leftColRight, box1Top, leftColRight, box1Bottom); // vertical divider (full height, both columns)
 
-  // Left column: title + M.R.C NO / DATE
+  const subRowY = box1Top + 19;
+  doc.line(left, subRowY, right, subRowY); // single continuous horizontal divider across both columns
+
+  // Left column top: title
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(17);
   doc.text('DELIVERY CHALLAN', left + leftColWidth / 2, box1Top + 12, { align: 'center' });
 
-  const subRowY = box1Top + 19;
-  doc.line(left, subRowY, leftColRight, subRowY); // horizontal divider
+  // Left column bottom: DC NO. | DATE
   const leftSubColRight = left + leftColWidth / 2;
   doc.line(leftSubColRight, subRowY, leftSubColRight, box1Bottom); // vertical divider
 
@@ -117,7 +125,7 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   doc.text(dcNo || '-', left + 2, subRowY + 11);
   doc.text(date || new Date().toLocaleDateString(), leftSubColRight + 2, subRowY + 11);
 
-  // Right column: Consignee
+  // Right column top: Consignee
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.text('CONSIGNEE', leftColRight + 2, box1Top + 5);
@@ -125,15 +133,13 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   doc.setFontSize(10);
   doc.text(consignee || '-', leftColRight + 2, box1Top + 11, { maxWidth: width - leftColWidth - 4 });
 
-  const rightSubRowY = box1Bottom - 6;
-  doc.line(leftColRight, rightSubRowY, right, rightSubRowY); // horizontal divider
+  // Right column bottom: Consignee / Site Code No. (same row height as DC NO. / DATE)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text('CONSIGNEE / SITE CODE NO.', leftColRight + 2, rightSubRowY + 4);
+  doc.text('CONSIGNEE / SITE CODE NO.', leftColRight + 2, subRowY + 5);
   doc.setFont('helvetica', 'normal');
-  if (siteCode) {
-    doc.text(siteCode, leftColRight + 55, rightSubRowY + 4);
-  }
+  doc.setFontSize(10);
+  if (siteCode) doc.text(siteCode, leftColRight + 2, subRowY + 11, { maxWidth: width - leftColWidth - 4 });
 
   // --- Box 2: TRN CD / Codes Row ---
   const box2Top = box1Bottom;
@@ -189,9 +195,10 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   autoTable(doc, {
     startY: cursorY,
     margin: { left, right: 210 - right },
-    head: [['SL.\nNO.', 'DESCRIPTION', 'QUANTITY', 'UNIT', 'RATE\nRS.']],
+    head: [['SL.\nNO.', 'MATERIAL\nCODE', 'DESCRIPTION', 'QUANTITY', 'UNIT', 'RATE\nRS.']],
     body: items.map((item, idx) => [
       String(idx + 1),
+      item.materialCode ?? '',
       item.qrCode ? `${item.description}\nQR: ${item.qrCode}` : item.description,
       String(item.quantity ?? '1'),
       item.unit ?? 'NOS',
@@ -201,11 +208,12 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
     styles: { fontSize: 9, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.3 },
     headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center', lineWidth: 0.3 },
     columnStyles: {
-      0: { cellWidth: 14, halign: 'center' },
-      1: { cellWidth: 96 },
-      2: { cellWidth: 26, halign: 'center' },
-      3: { cellWidth: 22, halign: 'center' },
-      4: { cellWidth: 24, halign: 'center' },
+      0: { cellWidth: 12, halign: 'center' },
+      1: { cellWidth: 26, halign: 'center' },
+      2: { cellWidth: 78 },
+      3: { cellWidth: 24, halign: 'center' },
+      4: { cellWidth: 20, halign: 'center' },
+      5: { cellWidth: 22, halign: 'center' },
     },
   });
 
@@ -224,7 +232,7 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   doc.line(left + gatePassWidth, y, left + gatePassWidth, y + 14);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
-  doc.text('GATE PASS COPY APPROVED BY', left + gatePassWidth / 2, y + 6, { align: 'center' });
+  doc.text('GATE PASS COPY APPROVED BY', left + 2, y + 6);
   doc.text('TOTAL', left + gatePassWidth + 3, y + 6);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
@@ -253,7 +261,7 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   doc.line(left + vehicleWidth + lrWidth, y, left + vehicleWidth + lrWidth, y + 20);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text('VEHICLE / PATCH THROUGH', left + 2, y + 6);
+  doc.text('DESPATCH THROUGH', left + 2, y + 6);
   doc.text('LR / RR NO. & DATE', left + vehicleWidth + 2, y + 6);
   doc.setFont('helvetica', 'normal');
   if (vehicleDetails) doc.text(vehicleDetails, left + 2, y + 14, { maxWidth: vehicleWidth - 4 });
@@ -272,24 +280,47 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   if (freightPaid) doc.text(String(freightPaid), freightX + freightLabelWidth + 20, y + 17);
   y += 20;
 
-  // --- Receipt Details / For L&T ---
-  const recHeight = 28;
+  // --- Receipt Details (own box) / For L&T (separate box) ---
+  const recHeight = 32;
+  const forLtWidth = 45;
+  const recWidth = width - forLtWidth;
   doc.rect(left, y, width, recHeight);
-  doc.line(left + width / 2, y, left + width / 2, y + recHeight);
-  doc.setFont('helvetica', 'bold');
-  doc.text('RECEIPT DETAILS', left + 2, y + 6);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  if (receiptRmnNo) doc.text(receiptRmnNo, left + 2, y + recHeight - 9);
-  if (receiptDate) doc.text(receiptDate, left + 35, y + recHeight - 9);
-  doc.setFontSize(7);
-  doc.text('(RMN NO.)', left + 2, y + recHeight - 3);
-  doc.text('(DATE)', left + 35, y + recHeight - 3);
-  doc.text('(SIGNATURE OF RECEIVER)', left + 58, y + recHeight - 3, { maxWidth: width / 2 - 60 });
-
+  doc.line(left + recWidth, y, left + recWidth, y + recHeight);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text('FOR LARSEN & TOUBRO LIMITED CONSTRUCTION DIVISION', left + width / 2 + 2, y + 6, { maxWidth: width / 2 - 4 });
+  doc.text('RECEIPT DETAILS', left + 2, y + 6);
+  doc.text('FOR LARSEN & TOUBRO LIMITED CONSTRUCTION DIVISION', left + recWidth + 2, y + 6, { maxWidth: forLtWidth - 4 });
+  doc.line(left, y + 10, left + recWidth, y + 10);
+
+  // Row 1: Driver Name | Mobile Number
+  const row1Cols = [
+    { label: '(DRIVER NAME)', value: driverName, x: left + 2, w: recWidth / 2 - 4 },
+    { label: '(MOBILE NO.)', value: driverMobile, x: left + recWidth / 2 + 2, w: recWidth / 2 - 4 },
+  ];
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  row1Cols.forEach((col) => {
+    if (col.value) doc.text(String(col.value), col.x, y + 16, { maxWidth: col.w - 2 });
+  });
+  doc.setFontSize(6);
+  row1Cols.forEach((col) => {
+    doc.text(col.label, col.x, y + 19.5, { maxWidth: col.w - 2 });
+  });
+
+  // Row 2: Site MRN No. | Date | Signature of Receiver
+  const row2Cols = [
+    { label: 'Site MRN No', value: receiptRmnNo, x: left + 2, w: 26 },
+    { label: '(DATE)', value: receiptDate, x: left + 30, w: 22 },
+    { label: '(SIGNATURE OF RECEIVER)', value: '', x: left + 54, w: recWidth - 54 - 2 },
+  ];
+  doc.setFontSize(7.5);
+  row2Cols.forEach((col) => {
+    if (col.value) doc.text(String(col.value), col.x, y + recHeight - 9, { maxWidth: col.w - 2 });
+  });
+  doc.setFontSize(6);
+  row2Cols.forEach((col) => {
+    doc.text(col.label, col.x, y + recHeight - 3, { maxWidth: col.w - 2 });
+  });
   y += recHeight;
 
   // --- Remarks Box ---
@@ -312,27 +343,40 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
 
   doc.setFontSize(7.5);
   doc.text('COPY DISTRIBUTION', left, y + 11);
-  const selectedCopies = copyDistribution && copyDistribution.length > 0
-    ? copyDistribution
-    : COPY_DISTRIBUTION_OPTIONS.map((opt) => opt.id);
+  const selectedCopies = copyDistribution || [];
 
   let copyXCursor = left + 30;
-  const separator = '   |   ';
-  const visibleCopies = COPY_DISTRIBUTION_OPTIONS.filter((opt) => selectedCopies.includes(opt.id));
-  visibleCopies.forEach((opt, idx) => {
+  const separator = '   ';
+  const boxSize = 2.6;
+  COPY_DISTRIBUTION_OPTIONS.forEach((opt, idx) => {
     const label = opt.label.replace(/^\d+\.\s*/, '');
+    const isChecked = selectedCopies.includes(opt.id);
+
+    // Checkbox square
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.25);
+    const boxY = y + 11 - boxSize + 0.5;
+    doc.rect(copyXCursor, boxY, boxSize, boxSize);
+    if (isChecked) {
+      doc.setLineWidth(0.35);
+      doc.line(copyXCursor, boxY, copyXCursor + boxSize, boxY + boxSize);
+      doc.line(copyXCursor, boxY + boxSize, copyXCursor + boxSize, boxY);
+    }
+    copyXCursor += boxSize + 1;
+
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(220, 38, 38);
+    doc.setTextColor(isChecked ? 220 : 120, isChecked ? 38 : 120, isChecked ? 38 : 120);
     doc.text(label, copyXCursor, y + 11);
     copyXCursor += doc.getTextWidth(label);
 
-    if (idx < visibleCopies.length - 1) {
+    if (idx < COPY_DISTRIBUTION_OPTIONS.length - 1) {
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(0);
       doc.text(separator, copyXCursor, y + 11);
       copyXCursor += doc.getTextWidth(separator);
     }
   });
+  doc.setLineWidth(0.2);
   doc.setTextColor(0);
 
   return doc;

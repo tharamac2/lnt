@@ -11,12 +11,10 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { Checkbox } from './ui/checkbox';
 import { Trash2, Plus, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   buildDeliveryChallanDoc,
-  COPY_DISTRIBUTION_OPTIONS,
   DeliveryChallanItem,
   DeliveryChallanOptions,
 } from '../utils/deliveryChallan';
@@ -29,6 +27,9 @@ interface DeliveryChallanPreviewDialogProps {
 }
 
 type EditableFields = Omit<DeliveryChallanOptions, 'type' | 'items' | 'filename' | 'copyDistribution'>;
+
+// Copy Distribution checkboxes are always shown unchecked in the generated PDF
+const EMPTY_COPY_DISTRIBUTION: string[] = [];
 
 const emptyFields: EditableFields = {
   consignee: '',
@@ -53,6 +54,8 @@ const emptyFields: EditableFields = {
   freightPaid: '',
   receiptRmnNo: '',
   receiptDate: '',
+  driverName: '',
+  driverMobile: '',
 };
 
 const DeliveryChallanPreviewDialog = ({
@@ -63,15 +66,10 @@ const DeliveryChallanPreviewDialog = ({
 }: DeliveryChallanPreviewDialogProps) => {
   const [fields, setFields] = useState<EditableFields>(emptyFields);
   const [items, setItems] = useState<DeliveryChallanItem[]>([]);
-  const [copyDistribution, setCopyDistribution] = useState<string[]>(
-    COPY_DISTRIBUTION_OPTIONS.map((opt) => opt.id)
-  );
+  const copyDistribution = EMPTY_COPY_DISTRIBUTION;
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
-
-  const toggleCopyDistribution = (id: string, checked: boolean) => {
-    setCopyDistribution((prev) => (checked ? [...prev, id] : prev.filter((existing) => existing !== id)));
-  };
 
   const setField = (key: keyof EditableFields, value: string) => {
     setFields((prev) => ({ ...prev, [key]: value }));
@@ -102,13 +100,10 @@ const DeliveryChallanPreviewDialog = ({
         freightPaid: initialOptions.freightPaid || '',
         receiptRmnNo: initialOptions.receiptRmnNo || '',
         receiptDate: initialOptions.receiptDate || '',
+        driverName: initialOptions.driverName || '',
+        driverMobile: initialOptions.driverMobile || '',
       });
       setItems(initialOptions.items.map((item) => ({ ...item })));
-      setCopyDistribution(
-        initialOptions.copyDistribution && initialOptions.copyDistribution.length > 0
-          ? [...initialOptions.copyDistribution]
-          : COPY_DISTRIBUTION_OPTIONS.map((opt) => opt.id)
-      );
     }
   }, [open, initialOptions]);
 
@@ -116,6 +111,7 @@ const DeliveryChallanPreviewDialog = ({
     if (!open || !initialOptions) return;
 
     let revoked = false;
+    setPreviewLoading(true);
     const timer = setTimeout(() => {
       buildDeliveryChallanDoc({
         ...initialOptions,
@@ -131,8 +127,11 @@ const DeliveryChallanPreviewDialog = ({
             return blobUrl;
           });
         })
-        .catch((err) => console.error('Failed to build challan preview', err));
-    }, 400);
+        .catch((err) => {
+          console.error('Failed to build challan preview', err);
+          setPreviewLoading(false);
+        });
+    }, 600);
 
     return () => {
       revoked = true;
@@ -142,9 +141,10 @@ const DeliveryChallanPreviewDialog = ({
   }, [open, initialOptions, fields, items, copyDistribution]);
 
   useEffect(() => {
-    if (!open && previewUrl) {
-      URL.revokeObjectURL(previewUrl);
+    if (!open) {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
+      setPreviewLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -270,13 +270,19 @@ const DeliveryChallanPreviewDialog = ({
                 {items.map((item, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-2 border rounded-md p-2 items-center">
                     <Input
-                      className="col-span-5"
+                      className="col-span-4"
                       placeholder="Description"
                       value={item.description}
                       onChange={(e) => updateItem(idx, 'description', e.target.value)}
                     />
                     <Input
                       className="col-span-2"
+                      placeholder="Material Code"
+                      value={item.materialCode ?? ''}
+                      onChange={(e) => updateItem(idx, 'materialCode', e.target.value)}
+                    />
+                    <Input
+                      className="col-span-1"
                       placeholder="Qty"
                       value={String(item.quantity ?? '')}
                       onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
@@ -342,7 +348,7 @@ const DeliveryChallanPreviewDialog = ({
               <Label className="text-xs font-semibold text-gray-500 uppercase">Transport & Freight</Label>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Vehicle / Patch Through</Label>
+                  <Label className="text-xs">Despatch Through</Label>
                   <Input value={fields.vehicleDetails} onChange={(e) => setField('vehicleDetails', e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
@@ -365,12 +371,20 @@ const DeliveryChallanPreviewDialog = ({
               <Label className="text-xs font-semibold text-gray-500 uppercase">Receipt Details</Label>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">RMN No.</Label>
+                  <Label className="text-xs">Site MRN No</Label>
                   <Input value={fields.receiptRmnNo} onChange={(e) => setField('receiptRmnNo', e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Receipt Date</Label>
                   <Input value={fields.receiptDate} onChange={(e) => setField('receiptDate', e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Driver Name</Label>
+                  <Input value={fields.driverName} onChange={(e) => setField('driverName', e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Driver Mobile Number</Label>
+                  <Input value={fields.driverMobile} onChange={(e) => setField('driverMobile', e.target.value)} />
                 </div>
               </div>
               <p className="text-xs text-gray-400">Signature of receiver is filled in manually after printing.</p>
@@ -380,32 +394,19 @@ const DeliveryChallanPreviewDialog = ({
               <Label>Remarks</Label>
               <Textarea value={fields.remarks} onChange={(e) => setField('remarks', e.target.value)} rows={2} />
             </div>
-
-            {/* Copy distribution */}
-            <div className="space-y-2 border-t pt-4">
-              <Label className="text-xs font-semibold text-gray-500 uppercase">Copy Distribution</Label>
-              <div className="grid grid-cols-1 gap-2">
-                {COPY_DISTRIBUTION_OPTIONS.map((opt) => (
-                  <div key={opt.id} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`copy-dist-${opt.id}`}
-                      checked={copyDistribution.includes(opt.id)}
-                      onCheckedChange={(checked) => toggleCopyDistribution(opt.id, checked === true)}
-                    />
-                    <Label htmlFor={`copy-dist-${opt.id}`} className="text-sm font-normal cursor-pointer">
-                      {opt.label.replace(/^\d+\.\s*/, '')}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
 
-          <div className="border rounded-md overflow-hidden bg-gray-50 min-h-[400px]">
-            {previewUrl ? (
-              <iframe title="Delivery Challan Preview" src={previewUrl} className="w-full h-full min-h-[400px]" />
-            ) : (
-              <div className="flex items-center justify-center h-full min-h-[400px] text-sm text-gray-400">
+          <div className="relative border rounded-md overflow-hidden bg-gray-50 min-h-[400px]">
+            {previewUrl && (
+              <iframe
+                title="Delivery Challan Preview"
+                src={previewUrl}
+                className="w-full h-full min-h-[400px]"
+                onLoad={() => setPreviewLoading(false)}
+              />
+            )}
+            {(previewLoading || !previewUrl) && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-50 text-sm text-gray-400">
                 Generating preview...
               </div>
             )}
