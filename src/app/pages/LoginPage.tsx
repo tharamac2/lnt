@@ -19,7 +19,6 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [username, setUsername] = useState(''); // Will bet set based on role selection
   const [password, setPassword] = useState('');
-  const [adminAction, setAdminAction] = useState('new'); // Default to create new
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [scanning, setScanning] = useState(false);
@@ -37,8 +36,8 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
       handleWorkerAccess();
     } else {
       setSelectedRole(role);
-      if (role === 'store' || role === 'inspector' || role === 'data_entry' || role === 'inspection_employee' || role === 'management') {
-        setUsername(''); // Do not auto-fill for store, inspector, inspection employee and management
+      if (role === 'store' || role === 'inspector' || role === 'data_entry' || role === 'inspection_employee' || role === 'management' || role === 'admin') {
+        setUsername(''); // Do not auto-fill for store, inspector, inspection employee, management and admin
       } else {
         setUsername(role); // Auto-fill username based on role for simplicity in this flow
       }
@@ -59,13 +58,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
   const handleNavigation = (role: string, extraState = {}) => {
     switch (role) {
       case 'admin':
-        if (adminAction === 'new') {
-          navigate('/tool-master', { state: { view: 'new', mode: 'create', ...extraState } });
-        } else if (adminAction === 'edit') {
-          navigate('/tool-master', { state: { view: 'new', mode: 'edit', ...extraState } });
-        } else {
-          navigate('/tool-master', { state: { view: 'saved', ...extraState } });
-        }
+        navigate('/tool-master', { state: extraState });
         break;
       case 'inspector':
       case 'inspection_employee':
@@ -373,51 +366,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
 
               <div className="space-y-5">
 
-                {selectedRole === 'admin' && (
-                  <div className="space-y-3 p-4 bg-black/30 rounded-xl border border-white/5 shadow-inner">
-                    <Label className="text-neutral-400 text-xs font-bold uppercase tracking-wider">Session Action</Label>
-
-                    <div className="grid grid-cols-1 gap-2">
-                      {['new', 'edit', 'saved'].map((actionId) => (
-                        <label key={actionId} className={`flex items-center p-2.5 border rounded-lg cursor-pointer transition-colors ${adminAction === actionId ? 'border-blue-500/50 bg-blue-500/10' : 'border-white/10 hover:bg-white/5'}`}>
-                          <input
-                            type="radio"
-                            name="adminAction"
-                            value={actionId}
-                            checked={adminAction === actionId}
-                            onChange={(e) => setAdminAction(e.target.value)}
-                            className="w-4 h-4 text-blue-500 bg-transparent border-neutral-600 focus:ring-blue-500 focus:ring-offset-neutral-900"
-                          />
-                          <span className={`ml-3 text-sm font-medium ${adminAction === actionId ? 'text-blue-100' : 'text-neutral-300'}`}>
-                            {actionId === 'new' && 'Create New Tool'}
-                            {actionId === 'edit' && 'Edit Existing Tool'}
-                            {actionId === 'saved' && 'Inventory View'}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-
-                    {adminAction === 'edit' && (
-                      <div className="pt-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className={`w-full h-10 rounded-lg text-sm font-medium border transition-colors ${scannedQr
-                            ? 'bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30'
-                            : 'bg-white/5 border-white/10 text-neutral-300 hover:bg-white/10'
-                            }`}
-                          onClick={() => fileInputRef.current?.click()}
-                        >
-                          <Camera className="w-4 h-4 mr-2" />
-                          {scannedQr ? 'QR Scanned (Ready)' : 'Scan QR for Direct Edit'}
-                        </Button>
-                        <div id="reader-hidden-login" className="hidden"></div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {(selectedRole === 'store' || selectedRole === 'inspector' || selectedRole === 'data_entry' || selectedRole === 'inspection_employee' || selectedRole === 'management') && (
+                {(selectedRole === 'store' || selectedRole === 'inspector' || selectedRole === 'data_entry' || selectedRole === 'inspection_employee' || selectedRole === 'management' || selectedRole === 'admin') && (
                   <div className="space-y-2">
                     <Label htmlFor="username" className="text-xs font-bold text-neutral-400 uppercase tracking-wider block">User ID / Mail ID</Label>
                     <div className="relative">
@@ -431,7 +380,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         className="h-12 w-full pl-10 pr-3 rounded-xl border-white/10 bg-black/40 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm shadow-inner transition-all text-white placeholder:text-neutral-600"
-                        autoFocus={selectedRole === 'store' || selectedRole === 'inspector' || selectedRole === 'data_entry' || selectedRole === 'inspection_employee' || selectedRole === 'management'}
+                        autoFocus={selectedRole === 'store' || selectedRole === 'inspector' || selectedRole === 'data_entry' || selectedRole === 'inspection_employee' || selectedRole === 'management' || selectedRole === 'admin'}
                       />
                     </div>
                   </div>
@@ -451,7 +400,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                       onChange={(e) => setPassword(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && !otpRequired && handleLogin()}
                       className="h-12 w-full pl-10 pr-10 rounded-xl border-white/10 bg-black/40 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm shadow-inner transition-all text-white placeholder:text-neutral-600"
-                      autoFocus={selectedRole !== 'store' && selectedRole !== 'inspector' && selectedRole !== 'data_entry' && selectedRole !== 'inspection_employee' && selectedRole !== 'management'}
+                      autoFocus={selectedRole !== 'store' && selectedRole !== 'inspector' && selectedRole !== 'data_entry' && selectedRole !== 'inspection_employee' && selectedRole !== 'management' && selectedRole !== 'admin'}
                       disabled={otpRequired}
                     />
                     <button
