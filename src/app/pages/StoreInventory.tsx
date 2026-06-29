@@ -45,6 +45,12 @@ const StoreInventory = () => {
   const [makeFilter, setMakeFilter] = useState('all');
   const [selectedToolIds, setSelectedToolIds] = useState<Set<number>>(new Set());
   const lastSelectedIndexRef = useRef<number>(-1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [inventorySearch, statusFilter, makeFilter]);
 
   // Pending Return Resolution State
   const [selectedPendingTool, setSelectedPendingTool] = useState<any | null>(null);
@@ -161,15 +167,19 @@ const StoreInventory = () => {
     });
   }, [inventoryTools, inventorySearch, statusFilter, makeFilter]);
 
+  const totalPages = Math.ceil(filteredInventoryTools.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedInventoryTools = filteredInventoryTools.slice(startIndex, startIndex + itemsPerPage);
+
   const toggleToolSelection = (toolId: number, shiftKey: boolean = false) => {
-    const currentIndex = filteredInventoryTools.findIndex((t) => t.id === toolId);
+    const currentIndex = paginatedInventoryTools.findIndex((t) => t.id === toolId);
     if (shiftKey && lastSelectedIndexRef.current >= 0) {
       const start = Math.min(lastSelectedIndexRef.current, currentIndex);
       const end = Math.max(lastSelectedIndexRef.current, currentIndex);
       setSelectedToolIds((prev) => {
         const next = new Set(prev);
         for (let i = start; i <= end; i++) {
-          next.add(filteredInventoryTools[i].id);
+          next.add(paginatedInventoryTools[i].id);
         }
         return next;
       });
@@ -187,18 +197,18 @@ const StoreInventory = () => {
     lastSelectedIndexRef.current = currentIndex;
   };
 
-  const allFilteredSelected = filteredInventoryTools.length > 0 &&
-    filteredInventoryTools.every((tool) => selectedToolIds.has(tool.id));
+  const allFilteredSelected = paginatedInventoryTools.length > 0 &&
+    paginatedInventoryTools.every((tool) => selectedToolIds.has(tool.id));
 
   const toggleSelectAll = () => {
     setSelectedToolIds((prev) => {
       if (allFilteredSelected) {
         const next = new Set(prev);
-        filteredInventoryTools.forEach((tool) => next.delete(tool.id));
+        paginatedInventoryTools.forEach((tool) => next.delete(tool.id));
         return next;
       }
       const next = new Set(prev);
-      filteredInventoryTools.forEach((tool) => next.add(tool.id));
+      paginatedInventoryTools.forEach((tool) => next.add(tool.id));
       return next;
     });
   };
@@ -462,8 +472,9 @@ const StoreInventory = () => {
         <CardContent className="p-0">
           {inventoryTools.length > 0 ? (
             filteredInventoryTools.length > 0 ? (
-              <div className="max-h-[500px] overflow-x-auto overflow-y-auto [&>div]:overflow-visible">
-                <Table className="border-separate border-spacing-0">
+              <>
+                <div className="max-h-[500px] overflow-x-auto overflow-y-auto [&>div]:overflow-visible">
+                  <Table className="border-separate border-spacing-0">
                   <TableHeader className="sticky top-0 border-b border-gray-100 z-10 shadow-sm [&_th]:bg-white">
                     <TableRow>
                       <TableHead className="w-10">
@@ -480,7 +491,7 @@ const StoreInventory = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredInventoryTools.map((tool) => (
+                    {paginatedInventoryTools.map((tool) => (
                       <TableRow key={tool.id} className="hover:bg-blue-50/20 cursor-pointer" onClick={() => navigate('/store-view', { state: { qrCode: tool.qr_code } })}>
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox
@@ -514,6 +525,37 @@ const StoreInventory = () => {
                   </TableBody>
                 </Table>
               </div>
+
+              {/* Pagination Controls */}
+              {filteredInventoryTools.length > 0 && (
+                <div className="flex items-center justify-between gap-4 mt-4 px-2">
+                  <span className="text-sm text-gray-500">
+                    Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredInventoryTools.length)} of {filteredInventoryTools.length} tools
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm font-medium">
+                      Page {currentPage} of {totalPages || 1}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages || totalPages === 0}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
             ) : (
               <div className="p-8 text-center text-gray-400 flex flex-col items-center">
                 <Search className="w-12 h-12 text-gray-200 mb-2" />

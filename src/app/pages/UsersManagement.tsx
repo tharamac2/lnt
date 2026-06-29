@@ -29,6 +29,8 @@ import api from '../services/api';
 const UsersManagement = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [storeLocations, setStoreLocations] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const fetchStores = async () => {
     try {
@@ -404,6 +406,10 @@ const UsersManagement = () => {
         return <Badge variant="secondary">{role}</Badge>;
     }
   };
+
+  const totalPages = Math.ceil(users.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedUsers = users.slice(startIndex, startIndex + itemsPerPage);
 
   return (
     <div className="space-y-6">
@@ -795,42 +801,80 @@ const UsersManagement = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user, index) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-mono">{index + 1}</TableCell>
-                  <TableCell className="font-medium">{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>{getRoleBadge(user.role)}</TableCell>
-                  <TableCell>{user.site}</TableCell>
-                  <TableCell>
-                    <Switch
-                      checked={user.status === 'active'}
-                      onCheckedChange={() => toggleUserStatus(user.id)}
-                      title={user.isInspectionEmployee ? (user.status === 'active' ? 'Verified - click to unverify' : 'Pending - click to verify') : undefined}
-                    />
-                  </TableCell>
-                  <TableCell>{new Date(user.lastLogin).toLocaleDateString()}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      {!user.isInspectionEmployee && (
-                        <Button size="sm" variant="ghost" onClick={() => handleEditClick(user)}>
-                          <Edit className="w-4 h-4" />
+              {paginatedUsers.length > 0 ? (
+                paginatedUsers.map((user, index) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-mono">{startIndex + index + 1}</TableCell>
+                    <TableCell className="font-medium">{user.name}</TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>{getRoleBadge(user.role)}</TableCell>
+                    <TableCell>{user.site}</TableCell>
+                    <TableCell>
+                      <Switch
+                        checked={user.status === 'active'}
+                        onCheckedChange={() => toggleUserStatus(user.id)}
+                        title={user.isInspectionEmployee ? (user.status === 'active' ? 'Verified - click to unverify' : 'Pending - click to verify') : undefined}
+                      />
+                    </TableCell>
+                    <TableCell>{new Date(user.lastLogin).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        {!user.isInspectionEmployee && (
+                          <Button size="sm" variant="ghost" onClick={() => handleEditClick(user)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteUser(user.id)}
+                        >
+                          <Trash2 className="w-4 h-4 text-red-600" />
                         </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDeleteUser(user.id)}
-                      >
-                        <Trash2 className="w-4 h-4 text-red-600" />
-                      </Button>
-                    </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-24 text-center">
+                    No users found.
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
           </div>
+
+          {/* Pagination Controls */}
+          {users.length > 0 && (
+            <div className="flex items-center justify-between gap-4 mt-4 p-4 border-t">
+              <span className="text-sm text-gray-500">
+                Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, users.length)} of {users.length} users
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm font-medium">
+                  Page {currentPage} of {totalPages || 1}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages || totalPages === 0}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

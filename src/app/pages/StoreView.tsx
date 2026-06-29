@@ -65,8 +65,10 @@ const StoreView = () => {
 
   // Dealers (Sub Contractor / Supplier / Scrap Dealer) for auto-fill dropdowns
   const [dealers, setDealers] = useState<any[]>([]);
+  const [stores, setStores] = useState<string[]>([]);
   useEffect(() => {
     api.get('/dealers/').then((res) => setDealers(res.data || [])).catch((err) => console.error('Failed to fetch dealers', err));
+    api.get('/users/stores').then((res) => setStores(res.data.stores || [])).catch((err) => console.error('Failed to fetch stores', err));
   }, []);
   const dealersByCategory = (category: string) => dealers.filter((d) => d.category === category);
   const applyDealer = (dealerId: string) => {
@@ -302,6 +304,10 @@ const StoreView = () => {
             : '';
           payload.remarks = `New Product Received.${supplierInfo} ${formData.remarks}`;
         } else if (inSubCategory === 'site_receive') {
+          payload.subcontractor_name = null;
+          payload.subcontractor_code = null;
+          payload.subcontractor_mobile = null;
+          payload.debit_to = null;
           payload.remarks = `Received from Site ${scannedTool.current_site}. ${formData.remarks}`;
         } else if (inSubCategory === 'found_recovered') {
           payload.status = 'usable'; // Reset status
@@ -323,6 +329,12 @@ const StoreView = () => {
           payload.subcontractor_name = null; // Clear subcon if moving site to site? Depends on workflow. Assuming clear.
           payload.subcontractor_code = null;
           payload.remarks = `Transferred to Site: ${formData.targetSite}. ${formData.remarks}`;
+        } else if (outSubCategory === 'store_transfer') {
+          payload.current_site = formData.targetSite;
+          payload.subcontractor_name = null; // Clear subcon
+          payload.subcontractor_code = null;
+          payload.subcontractor_mobile = null;
+          payload.remarks = `Transferred to Store: ${formData.targetSite}. ${formData.remarks}`;
         } else if (outSubCategory === 'scrap_disposal') {
           payload.status = 'scrapped';
           payload.current_site = 'Scrap Yard';
@@ -647,7 +659,7 @@ const StoreView = () => {
                   {transactionType === 'out' && (
                     <div className="space-y-4 animate-in slide-in-from-right-2">
                       <Label>Despatch Type</Label>
-                      <RadioGroup value={outSubCategory} onValueChange={setOutSubCategory} className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      <RadioGroup value={outSubCategory} onValueChange={setOutSubCategory} className="grid grid-cols-1 md:grid-cols-4 gap-2">
                         <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-gray-50">
                           <RadioGroupItem value="subcon_work" id="d1" />
                           <Label htmlFor="d1" className="cursor-pointer">Issue to Sub-Contractor</Label>
@@ -655,6 +667,10 @@ const StoreView = () => {
                         <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-gray-50">
                           <RadioGroupItem value="site_transfer" id="d2" />
                           <Label htmlFor="d2" className="cursor-pointer">Transfer to Next Site</Label>
+                        </div>
+                        <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-blue-50 border-blue-200">
+                          <RadioGroupItem value="store_transfer" id="d4" />
+                          <Label htmlFor="d4" className="cursor-pointer text-blue-700">Transfer to Next Store</Label>
                         </div>
                         <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-red-50 border-red-200">
                           <RadioGroupItem value="scrap_disposal" id="d3" />
@@ -806,22 +822,38 @@ const StoreView = () => {
                       </>
                     )}
 
-                    {(transactionType === 'out' || inSubCategory === 'site_receive') && (
+                    {(transactionType === 'out' || inSubCategory === 'site_receive') && outSubCategory !== 'store_transfer' && (
                       <div className="space-y-2">
                         <Label>
                           {transactionType === 'out'
-                            ? (outSubCategory === 'subcon_work' ? 'Site Code' : 'Next Store')
+                            ? (outSubCategory === 'subcon_work' ? 'Site Code' : 'Next Site Code')
                             : 'Origin Site (Optional)'}
                         </Label>
                         <Input
                           placeholder={
                             transactionType === 'out'
-                              ? (outSubCategory === 'subcon_work' ? 'Site Code' : 'Store Name')
+                              ? (outSubCategory === 'subcon_work' ? 'Site Code' : 'Site Name')
                               : 'Site Name'
                           }
                           value={formData.targetSite}
                           onChange={(e) => setFormData({ ...formData, targetSite: e.target.value })}
                         />
+                      </div>
+                    )}
+
+                    {(transactionType === 'out' && outSubCategory === 'store_transfer') && (
+                      <div className="space-y-2">
+                        <Label>Next Store</Label>
+                        <select
+                          value={formData.targetSite}
+                          onChange={(e) => setFormData({ ...formData, targetSite: e.target.value })}
+                          className="w-full h-10 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                          <option value="">-- Select Destination Store --</option>
+                          {stores.map((s, i) => (
+                            <option key={i} value={s}>{s}</option>
+                          ))}
+                        </select>
                       </div>
                     )}
 

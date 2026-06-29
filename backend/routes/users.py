@@ -14,8 +14,16 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.post("/token")
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
-    statement = select(User).where(User.username == form_data.username)
+    username = form_data.username.strip()
+    
+    # Try looking up in User table by username, email, or phone
+    statement = select(User).where(
+        (User.username == username) | 
+        (User.email == username) | 
+        (User.phone == username)
+    )
     user = session.exec(statement).first()
+    
     if user and verify_password(form_data.password, user.hashed_password):
         if user.status != "active":
             raise HTTPException(
@@ -24,29 +32,69 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": user.username, "role": user.role}, expires_delta=access_token_expires
-        )
+        # Worker role does NOT require OTP verification
+        if user.role == "worker":
+            access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+            access_token = create_access_token(
+                data={"sub": user.username, "role": user.role}, expires_delta=access_token_expires
+            )
+            log_action(
+                session, user, "login", "User", user.id,
+                f"{user.full_name or user.username} logged in",
+                site=user.site,
+            )
+            session.commit()
+            return {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "role": user.role,
+                "full_name": user.full_name,
+                "site": user.site
+            }
+        else:
+            # All other roles require OTP verification
+            use_sms = False
+            if "@" in username:
+                use_sms = False
+            elif username == user.phone or (username.isdigit() and len(username) >= 10):
+                use_sms = True
+            elif user.phone:
+                use_sms = True
 
-        log_action(
-            session, user, "login", "User", user.id,
-            f"{user.full_name or user.username} logged in",
-            site=user.site,
-        )
-        session.commit()
-
-        return {
-            "access_token": access_token,
-            "token_type": "bearer",
-            "role": user.role,
-            "full_name": user.full_name,
-            "site": user.site
-        }
+            if use_sms and user.phone:
+                try:
+                    email_utils.send_otp_sms(user.phone)
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Failed to send SMS verification OTP: {str(e)}"
+                    )
+                return {
+                    "otp_required": True,
+                    "phone": user.phone,
+                    "sender_phone": "9123585284"
+                }
+            else:
+                try:
+                    email_utils.send_otp_email(user.email)
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Failed to send email verification OTP: {str(e)}"
+                    )
+                return {
+                    "otp_required": True,
+                    "email": user.email
+                }
 
     # Fall back to Inspection Employee accounts (separate table, same login page)
-    statement = select(Inspector).where(Inspector.email == form_data.username)
-    inspector = session.exec(statement).first()
+    inspector_statement = select(Inspector).where(
+        (Inspector.employee_id == username) |
+        (Inspector.email == username) |
+        (Inspector.contact_number == username)
+    )
+    inspector = session.exec(inspector_statement).first()
+    
     if inspector and verify_password(form_data.password, inspector.hashed_password):
         if inspector.status != "verified":
             raise HTTPException(
@@ -55,31 +103,44 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": inspector.email, "role": "inspection_employee", "type": "inspector"},
-            expires_delta=access_token_expires,
-        )
+        # Inspectors/Inspection Employees are NOT workers, so they always require OTP verification
+        use_sms = False
+        if "@" in username:
+            use_sms = False
+        elif username == inspector.contact_number or (username.isdigit() and len(username) >= 10):
+            use_sms = True
+        elif inspector.contact_number:
+            use_sms = True
 
-        site = inspector.creator.site if inspector.creator else None
-        log_action(
-            session, inspector, "login", "Inspector", inspector.id,
-            f"{inspector.name} logged in",
-            site=site,
-        )
-        session.commit()
-
-        return {
-            "access_token": access_token,
-            "token_type": "bearer",
-            "role": "inspection_employee",
-            "full_name": inspector.name,
-            "site": site,
-        }
+        if use_sms and inspector.contact_number:
+            try:
+                email_utils.send_otp_sms(inspector.contact_number)
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to send SMS verification OTP: {str(e)}"
+                )
+            return {
+                "otp_required": True,
+                "phone": inspector.contact_number,
+                "sender_phone": "9123585284"
+            }
+        else:
+            try:
+                email_utils.send_otp_email(inspector.email)
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to send email verification OTP: {str(e)}"
+                )
+            return {
+                "otp_required": True,
+                "email": inspector.email
+            }
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="No users found",
+        detail="Invalid credentials. Please check your username, email, or phone number and password.",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
@@ -89,33 +150,107 @@ class LoginOTPVerifyRequest(BaseModel):
 
 @router.post("/token/verify-otp")
 def verify_login_otp(payload: LoginOTPVerifyRequest, session: Session = Depends(get_session)):
-    statement = select(User).where(User.username == payload.username)
-    user = session.exec(statement).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="No users found")
-    if not email_utils.verify_otp(user.email, payload.otp):
-        raise HTTPException(status_code=400, detail="Invalid or expired verification code")
-    email_utils.clear_verification(user.email)
-
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username, "role": user.role}, expires_delta=access_token_expires
+    username = payload.username.strip()
+    
+    # Look up User
+    user_stmt = select(User).where(
+        (User.username == username) |
+        (User.email == username) |
+        (User.phone == username)
     )
+    user = session.exec(user_stmt).first()
+    
+    if user:
+        verified = False
+        use_sms = False
+        if "@" in username:
+            use_sms = False
+        elif username == user.phone or (username.isdigit() and len(username) >= 10):
+            use_sms = True
+        elif user.phone:
+            use_sms = True
 
-    log_action(
-        session, user, "login", "User", user.id,
-        f"{user.full_name or user.username} logged in",
-        site=user.site,
+        if use_sms and user.phone:
+            if email_utils.verify_otp(user.phone, payload.otp):
+                email_utils.clear_verification(user.phone)
+                verified = True
+        elif user.email:
+            if email_utils.verify_otp(user.email, payload.otp):
+                email_utils.clear_verification(user.email)
+                verified = True
+
+        if not verified:
+            raise HTTPException(status_code=400, detail="Invalid or expired verification code")
+
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.username, "role": user.role}, expires_delta=access_token_expires
+        )
+        log_action(
+            session, user, "login", "User", user.id,
+            f"{user.full_name or user.username} logged in",
+            site=user.site,
+        )
+        session.commit()
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "role": user.role,
+            "full_name": user.full_name,
+            "site": user.site
+        }
+        
+    # Look up Inspector
+    inspector_stmt = select(Inspector).where(
+        (Inspector.employee_id == username) |
+        (Inspector.email == username) |
+        (Inspector.contact_number == username)
     )
-    session.commit()
+    inspector = session.exec(inspector_stmt).first()
+    
+    if inspector:
+        verified = False
+        use_sms = False
+        if "@" in username:
+            use_sms = False
+        elif username == inspector.contact_number or (username.isdigit() and len(username) >= 10):
+            use_sms = True
+        elif inspector.contact_number:
+            use_sms = True
 
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "role": user.role,
-        "full_name": user.full_name,
-        "site": user.site
-    }
+        if use_sms and inspector.contact_number:
+            if email_utils.verify_otp(inspector.contact_number, payload.otp):
+                email_utils.clear_verification(inspector.contact_number)
+                verified = True
+        elif inspector.email:
+            if email_utils.verify_otp(inspector.email, payload.otp):
+                email_utils.clear_verification(inspector.email)
+                verified = True
+
+        if not verified:
+            raise HTTPException(status_code=400, detail="Invalid or expired verification code")
+
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": inspector.employee_id, "role": "inspection_employee", "type": "inspector"},
+            expires_delta=access_token_expires,
+        )
+        site = inspector.creator.site if inspector.creator else None
+        log_action(
+            session, inspector, "login", "Inspector", inspector.id,
+            f"{inspector.name} logged in",
+            site=site,
+        )
+        session.commit()
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "role": "inspection_employee",
+            "full_name": inspector.name,
+            "site": site,
+        }
+        
+    raise HTTPException(status_code=401, detail="No users found")
 
 class EmailRequest(BaseModel):
     email: EmailStr
@@ -126,10 +261,6 @@ class OTPVerifyRequest(BaseModel):
 
 @router.post("/send-otp")
 def send_email_otp(payload: EmailRequest, session: Session = Depends(get_session)):
-    existing_user = session.exec(select(User).where(User.email == payload.email)).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-
     try:
         email_utils.send_otp_email(payload.email)
     except RuntimeError as e:
@@ -152,6 +283,11 @@ def create_user(user: UserCreate, session: Session = Depends(get_session)): # Re
     existing_user = session.exec(statement).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already registered")
+
+    if user.phone:
+        existing_phone = session.exec(select(User).where(User.phone == user.phone)).first()
+        if existing_phone:
+            raise HTTPException(status_code=400, detail="Mobile number already registered")
 
     if not email_utils.is_email_verified(user.email):
         raise HTTPException(status_code=400, detail="Email address has not been verified")
@@ -184,6 +320,12 @@ def create_user(user: UserCreate, session: Session = Depends(get_session)): # Re
         site=db_user.site,
     )
     session.commit()
+
+    if db_user.phone:
+        try:
+            email_utils.register_twilio_verified_caller_id(db_user.phone, db_user.full_name)
+        except Exception as e:
+            print(f"Failed to register Twilio verified caller ID: {e}")
     
     return db_user
 
@@ -211,7 +353,7 @@ async def read_users_me(current_user = Depends(get_current_user)):
     if isinstance(current_user, Inspector):
         return {
             "id": current_user.id,
-            "username": current_user.email,
+            "username": current_user.employee_id,
             "email": current_user.email,
             "full_name": current_user.name,
             "role": "inspection_employee",
@@ -277,4 +419,11 @@ def update_user(user_id: int, user_update: UserUpdate, session: Session = Depend
     session.add(db_user)
     session.commit()
     session.refresh(db_user)
+
+    if "phone" in user_data and db_user.phone:
+        try:
+            email_utils.register_twilio_verified_caller_id(db_user.phone, db_user.full_name)
+        except Exception as e:
+            print(f"Failed to register Twilio verified caller ID: {e}")
+
     return db_user

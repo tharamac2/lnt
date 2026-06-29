@@ -4,7 +4,7 @@ from sqlmodel import SQLModel, Field, Relationship
 
 class UserBase(SQLModel):
     username: str = Field(index=True, unique=True)
-    email: str = Field(index=True, unique=True)
+    email: str = Field(index=True)
     full_name: Optional[str] = None
     role: str = "worker" # admin, store, inspector, management, worker, data_entry
     site: Optional[str] = None
@@ -224,7 +224,7 @@ class AuditLogRead(AuditLogBase):
 class InspectorBase(SQLModel):
     name: str
     employee_id: str = Field(index=True, unique=True)
-    email: str = Field(index=True, unique=True)
+    email: str = Field(index=True)
     designation: Optional[str] = None
     department: Optional[str] = None
     contact_number: Optional[str] = None

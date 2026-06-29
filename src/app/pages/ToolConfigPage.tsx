@@ -5,7 +5,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
-import { Wrench, Sliders, Trash2, Search, PlusCircle, AlertCircle, FileSpreadsheet, CheckCircle2, ChevronDown, ChevronRight, Pencil, Check, X } from 'lucide-react';
+import { Wrench, Sliders, Trash, Trash2, Search, PlusCircle, AlertCircle, FileSpreadsheet, CheckCircle2, ChevronDown, ChevronRight, Pencil, Edit, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../services/api';
 
@@ -40,6 +40,8 @@ const ToolConfigPage = () => {
   const [isImporting, setIsImporting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 25;
   const [editingCode, setEditingCode] = useState('');
   const [savingCode, setSavingCode] = useState(false);
 
@@ -141,15 +143,6 @@ const ToolConfigPage = () => {
     }
   };
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      // Select all filtered IDs
-      setSelectedIds(filteredConfigs.map(c => c.id));
-    } else {
-      setSelectedIds([]);
-    }
-  };
-
   const handleSelectRow = (id: number, checked: boolean) => {
     if (checked) {
       setSelectedIds(prev => [...prev, id]);
@@ -210,8 +203,32 @@ const ToolConfigPage = () => {
       config.item_code.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const allSelected = filteredConfigs.length > 0 && filteredConfigs.every(c => selectedIds.includes(c.id));
-  const someSelected = filteredConfigs.some(c => selectedIds.includes(c.id)) && !allSelected;
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  const totalPages = Math.ceil(filteredConfigs.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedConfigs = filteredConfigs.slice(startIndex, startIndex + itemsPerPage);
+
+  const allSelected = paginatedConfigs.length > 0 && paginatedConfigs.every(c => selectedIds.includes(c.id));
+  const someSelected = paginatedConfigs.some(c => selectedIds.includes(c.id)) && !allSelected;
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        paginatedConfigs.forEach(c => next.add(c.id));
+        return Array.from(next);
+      });
+    } else {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        paginatedConfigs.forEach(c => next.delete(c.id));
+        return Array.from(next);
+      });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -365,8 +382,9 @@ const ToolConfigPage = () => {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-lg border border-gray-100">
-                  <Table>
+                <>
+                  <div className="overflow-x-auto rounded-lg border border-gray-100">
+                    <Table>
                     <TableHeader className="bg-gray-50">
                       <TableRow>
                         <TableHead className="w-[50px]">
@@ -464,39 +482,56 @@ const ToolConfigPage = () => {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDeleteConfig(config.id, config.tool_name)}
-                                  disabled={config.has_printed_tools}
-                                  className={`${
-                                    config.has_printed_tools
-                                      ? 'text-gray-300 cursor-not-allowed hover:bg-transparent'
-                                      : 'text-red-500 hover:text-red-700 hover:bg-red-50'
-                                  } transition-colors`}
-                                  title={
-                                    config.has_printed_tools
-                                      ? 'Cannot delete configuration: matching tools have been printed'
-                                      : 'Delete Configuration'
-                                  }
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleStartEditCode(config.id, config.item_code)}
+                                    className="h-8 w-8 text-gray-500 hover:text-blue-700 hover:bg-blue-55 rounded-full"
+                                    title="Edit Item Code"
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDeleteConfig(config.id, config.tool_name)}
+                                    disabled={config.has_printed_tools}
+                                    className={`h-8 w-8 rounded-full ${
+                                      config.has_printed_tools
+                                        ? 'text-gray-300 cursor-not-allowed hover:bg-transparent'
+                                        : 'text-red-500 hover:text-red-700 hover:bg-red-55'
+                                    } transition-colors`}
+                                    title={
+                                      config.has_printed_tools
+                                        ? 'Cannot delete configuration: matching tools have been printed'
+                                        : 'Delete Configuration'
+                                    }
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
+
                             {isExpanded && (
-                              <TableRow className="bg-gray-50/40 hover:bg-gray-50/40">
-                                <TableCell colSpan={7} className="p-4">
-                                  <div className="pl-12 pr-6 py-4 bg-white border border-gray-100 rounded-lg shadow-sm">
-                                    <div className="flex items-center justify-between mb-3">
-                                      <h4 className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
-                                        <Wrench className="w-3.5 h-3.5 text-blue-600" />
-                                        Associated Tools ({config.tools?.length || 0})
-                                      </h4>
-                                      {config.has_printed_tools && (
-                                        <Badge className="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] py-0 px-2 font-normal">
-                                          Contains Printed Tools (Deletion Blocked)
-                                        </Badge>
+                              <TableRow className="bg-slate-50/50 hover:bg-slate-50/50">
+                                <TableCell colSpan={7} className="p-4 border-t border-slate-100">
+                                  <div className="pl-6 space-y-3 animate-in fade-in slide-in-from-top-1 duration-250">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                                        <Wrench className="w-4 h-4 text-blue-500" />
+                                        Associated Tool Assets
+                                      </span>
+                                      {(!config.tools || config.tools.length === 0) && (
+                                        <Button
+                                          size="xs"
+                                          className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-[10px] h-7 px-3 py-1 flex items-center gap-1"
+                                          onClick={() => handleCreateInitialAsset(config)}
+                                        >
+                                          <Plus className="w-3.5 h-3.5" />
+                                          Create First Asset
+                                        </Button>
                                       )}
                                     </div>
                                     {!config.tools || config.tools.length === 0 ? (
@@ -559,9 +594,40 @@ const ToolConfigPage = () => {
                     </TableBody>
                   </Table>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+
+                {/* Pagination Controls */}
+                {filteredConfigs.length > 0 && (
+                  <div className="flex items-center justify-between gap-4 mt-4 px-2">
+                    <span className="text-sm text-gray-500">
+                      Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredConfigs.length)} of {filteredConfigs.length} configurations
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-sm font-medium">
+                        Page {currentPage} of {totalPages || 1}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages || totalPages === 0}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
         </div>
       </div>
     </div>

@@ -113,8 +113,15 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
 
       if (response.data.otp_required) {
         setOtpRequired(true);
-        setOtpEmail(response.data.email);
-        toast.success(`Verification code sent to ${response.data.email}`);
+        let destination = '';
+        if (response.data.phone) {
+          const sender = response.data.sender_phone ? ` from ${response.data.sender_phone}` : '';
+          destination = `phone ${response.data.phone}${sender}`;
+        } else {
+          destination = `email ${response.data.email}`;
+        }
+        setOtpEmail(destination);
+        toast.success(`Verification code sent to ${destination}`);
         return;
       }
 
@@ -366,9 +373,9 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
 
               <div className="space-y-5">
 
-                {(selectedRole === 'store' || selectedRole === 'inspector' || selectedRole === 'data_entry' || selectedRole === 'inspection_employee' || selectedRole === 'management' || selectedRole === 'admin') && (
+                 {(selectedRole === 'store' || selectedRole === 'inspector' || selectedRole === 'data_entry' || selectedRole === 'inspection_employee' || selectedRole === 'management' || selectedRole === 'admin') && (
                   <div className="space-y-2">
-                    <Label htmlFor="username" className="text-xs font-bold text-neutral-400 uppercase tracking-wider block">User ID / Mail ID</Label>
+                    <Label htmlFor="username" className="text-xs font-bold text-neutral-400 uppercase tracking-wider block">User ID / Mail ID / Phone number</Label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                         <UserCog className="h-4 w-4 text-neutral-500" />
@@ -376,7 +383,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
                       <Input
                         id="username"
                         type="text"
-                        placeholder="Enter User ID or Mail ID"
+                        placeholder="Enter User ID, Mail ID, or Phone number"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         className="h-12 w-full pl-10 pr-3 rounded-xl border-white/10 bg-black/40 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm shadow-inner transition-all text-white placeholder:text-neutral-600"

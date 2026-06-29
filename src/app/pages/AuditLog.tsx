@@ -5,6 +5,10 @@ import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { ScrollText, Search, X, Plus, Pencil, Trash2, LogIn, ArrowLeftRight, ClipboardCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '../services/api';
+import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { saveAs } from 'file-saver';
 import {
   Table,
   TableBody,
@@ -50,6 +54,120 @@ const AuditLogPage = () => {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+
+  const exportPDF = () => {
+    try {
+      const doc = new jsPDF();
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.text('L&T Audit Log Report', 14, 15);
+      
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 21);
+      doc.text(`Total Records: ${filteredLogs.length}`, 14, 26);
+      
+      const tableData = filteredLogs.map((log) => [
+        log.timestamp ? new Date(log.timestamp).toLocaleString() : '-',
+        log.username || 'System',
+        log.action.toUpperCase(),
+        log.description || '-',
+        log.site || '-',
+      ]);
+      
+      autoTable(doc, {
+        startY: 32,
+        head: [['Date & Time', 'User', 'Action', 'Description', 'Site']],
+        body: tableData,
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [30, 58, 138], textColor: [255, 255, 255] },
+        columnStyles: {
+          0: { cellWidth: 35 },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 90 },
+          4: { cellWidth: 20 },
+        },
+      });
+      
+      doc.save(`audit_log_${Date.now()}.pdf`);
+      toast.success('PDF report exported successfully');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to export PDF');
+    }
+  };
+
+  const exportDOC = () => {
+    try {
+      let content = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head>
+          <title>Audit Log Report</title>
+          <!--[if gte mso 9]>
+          <xml>
+            <w:WordDocument>
+              <w:View>Print</w:View>
+              <w:Zoom>100</w:Zoom>
+            </w:WordDocument>
+          </xml>
+          <![endif]-->
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10pt; }
+            h2 { color: #1E3A8A; }
+            table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+            th { background-color: #1E3A8A; color: white; font-weight: bold; text-align: left; padding: 6px; border: 1px solid #ddd; }
+            td { padding: 6px; border: 1px solid #ddd; font-size: 9.5pt; }
+            .meta { margin-bottom: 10px; color: #555; font-size: 9pt; }
+          </style>
+        </head>
+        <body>
+          <h2>L&T Audit Log Report</h2>
+          <div class="meta">
+            <strong>Generated on:</strong> ${new Date().toLocaleString()}<br/>
+            <strong>Total Records:</strong> ${filteredLogs.length}
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 20%">Date & Time</th>
+                <th style="width: 15%">User</th>
+                <th style="width: 10%">Action</th>
+                <th style="width: 45%">Description</th>
+                <th style="width: 10%">Site</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      filteredLogs.forEach((log) => {
+        content += `
+          <tr>
+            <td>${log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}</td>
+            <td>${log.username || 'System'}</td>
+            <td style="text-transform: uppercase;">${log.action}</td>
+            <td>${log.description || '-'}</td>
+            <td>${log.site || '-'}</td>
+          </tr>
+        `;
+      });
+
+      content += `
+            </tbody>
+          </table>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob(['\ufeff' + content], { type: 'application/msword' });
+      saveAs(blob, `audit_log_${Date.now()}.doc`);
+      toast.success('Word report exported successfully');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to export DOC');
+    }
+  };
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -101,7 +219,7 @@ const AuditLogPage = () => {
       </div>
 
       <Card>
-        <CardHeader className="bg-gray-50 pb-2 flex flex-row items-center justify-between">
+        <CardHeader className="bg-gray-50 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <CardTitle className="text-xl flex items-center gap-2">
               <ScrollText className="text-[#1E3A8A] w-5 h-5" />
@@ -109,9 +227,29 @@ const AuditLogPage = () => {
             </CardTitle>
             <CardDescription>Create, update, delete, login and movement events</CardDescription>
           </div>
-          <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 shadow-sm text-sm py-1 px-3">
-            {filteredLogs.length} of {logs.length} {logs.length === 1 ? 'Record' : 'Records'}
-          </Badge>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportPDF}
+              disabled={filteredLogs.length === 0}
+              className="text-[#1E3A8A] border-[#1E3A8A] hover:bg-blue-50 h-8"
+            >
+              Export PDF
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportDOC}
+              disabled={filteredLogs.length === 0}
+              className="text-emerald-700 border-emerald-200 hover:bg-emerald-50 h-8"
+            >
+              Export DOC
+            </Button>
+            <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 shadow-sm text-sm py-1 px-3">
+              {filteredLogs.length} of {logs.length} {logs.length === 1 ? 'Record' : 'Records'}
+            </Badge>
+          </div>
         </CardHeader>
 
         {logs.length > 0 && (

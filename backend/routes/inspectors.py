@@ -20,9 +20,10 @@ def create_inspector(
     if existing:
         raise HTTPException(status_code=400, detail="An employee with this Employee ID is already registered")
 
-    existing_email = session.exec(select(Inspector).where(Inspector.email == payload.email)).first()
-    if existing_email:
-        raise HTTPException(status_code=400, detail="An employee with this email is already registered")
+    if payload.contact_number:
+        existing_phone = session.exec(select(Inspector).where(Inspector.contact_number == payload.contact_number)).first()
+        if existing_phone:
+            raise HTTPException(status_code=400, detail="An employee with this contact number is already registered")
 
     if not email_utils.is_email_verified(payload.email):
         raise HTTPException(status_code=400, detail="Email address has not been verified")
@@ -41,6 +42,13 @@ def create_inspector(
         site=current_user.site,
     )
     session.commit()
+
+    if db_inspector.contact_number:
+        try:
+            email_utils.register_twilio_verified_caller_id(db_inspector.contact_number, db_inspector.name)
+        except Exception as e:
+            print(f"Failed to register Twilio verified caller ID: {e}")
+            
     return db_inspector
 
 @router.get("/")

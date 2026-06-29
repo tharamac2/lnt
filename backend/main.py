@@ -29,6 +29,17 @@ def on_startup():
     from .database import engine
     from sqlalchemy import text
     with engine.connect() as conn:
+        # Drop unique indexes on email and create non-unique ones
+        try:
+            conn.execute(text("DROP INDEX IF EXISTS ix_user_email"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_email ON user(email)"))
+            conn.execute(text("DROP INDEX IF EXISTS ix_inspector_email"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inspector_email ON inspector(email)"))
+            conn.commit()
+            print("Migration: Successfully updated user/inspector email indexes to be non-unique.")
+        except Exception as e:
+            print(f"Migration error updating email indexes: {e}")
+
         # Correct misspelled site names to TIRUNELVELI (e.g. TIRUNEVELI, thirunelveli)
         try:
             conn.execute(text("UPDATE tool SET current_site = 'TIRUNELVELI' WHERE LOWER(TRIM(current_site)) IN ('tiruneveli', 'thirunelveli')"))

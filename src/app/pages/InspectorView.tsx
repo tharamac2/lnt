@@ -40,6 +40,7 @@ const InspectorView = () => {
   // Site tool inventory + bulk selection
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [currentUserSite, setCurrentUserSite] = useState<string | null>(null);
+  const [allSites, setAllSites] = useState<string[]>([]);
   const [siteTools, setSiteTools] = useState<any[]>([]);
   const [loadingTools, setLoadingTools] = useState(false);
   const [inventorySearch, setInventorySearch] = useState('');
@@ -67,6 +68,10 @@ const InspectorView = () => {
       }
     };
     fetchCurrentUser();
+
+    api.get('/users/stores')
+      .then(res => setAllSites((res.data.stores as string[]) || []))
+      .catch(err => console.error('Failed to fetch stores list', err));
   }, []);
 
   const verifiedEmployee = employeeRecords.find((e) => e.status === 'verified');
@@ -366,15 +371,31 @@ const InspectorView = () => {
       {/* Site Tool Inventory - bulk selection */}
       {canViewTools && (
         <Card className="animate-in fade-in slide-in-from-top-4 duration-500">
-          <CardHeader className="bg-gray-50 pb-2 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Package className="text-[#1E3A8A] w-5 h-5" />
-                {currentUserSite || 'Site'} Tools
-              </CardTitle>
-              <CardDescription>Select one or more tools to inspect</CardDescription>
+          <CardHeader className="bg-gray-50 pb-2 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-center gap-4">
+              <div>
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <Package className="text-[#1E3A8A] w-5 h-5" />
+                  Site Tool Inventory
+                </CardTitle>
+                <CardDescription>Select one or more tools to inspect</CardDescription>
+              </div>
+              {allSites.length > 0 && (
+                <div className="w-full md:w-[200px]">
+                  <select
+                    value={currentUserSite || ''}
+                    onChange={(e) => setCurrentUserSite(e.target.value)}
+                    className="h-9 px-3 py-1 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] w-full"
+                  >
+                    <option value="" disabled>-- Select Site --</option>
+                    {allSites.map(site => (
+                      <option key={site} value={site}>{site}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
-            <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 shadow-sm text-sm py-1 px-3">
+            <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 shadow-sm text-sm py-1 px-3 w-fit">
               {filteredSiteTools.length} of {siteTools.length} {siteTools.length === 1 ? 'Item' : 'Items'}
             </Badge>
           </CardHeader>

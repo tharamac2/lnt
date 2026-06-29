@@ -312,6 +312,7 @@ async def bulk_import_dealers(
     success_count = 0
     skipped_count = 0
     errors = []
+    validation_statuses = []
 
     # Fetch all custom field definitions to map from Excel
     custom_field_defs = session.exec(select(DealerCustomField)).all()
@@ -321,9 +322,9 @@ async def bulk_import_dealers(
             row = row.where(pd.notnull(row), None)
             
             raw_category = str(row.get(category_col) or "").strip()
-            category = normalize_category(raw_category)
             if not category:
                 errors.append(f"Row {index+2}: Invalid category '{raw_category}'. Choose Sub Contractor, Supplier, or Scrap Dealer.")
+                validation_statuses.append(f"Failed: Invalid category '{raw_category}'")
                 continue
 
             name = str(row.get(name_col) or "").strip()
@@ -332,6 +333,7 @@ async def bulk_import_dealers(
 
             if not name or not company_name or not dealer_code:
                 errors.append(f"Row {index+2}: Missing Name, Company Name, or Dealer Code.")
+                validation_statuses.append("Failed: Missing Name, Company Name, or Dealer Code")
                 continue
 
             # Optional fields
@@ -351,6 +353,7 @@ async def bulk_import_dealers(
             existing = session.exec(stmt).first()
             if existing:
                 skipped_count += 1
+                validation_statuses.append("Skipped: Duplicate Code")
                 continue
 
             # Parse custom fields from excel row
@@ -385,9 +388,21 @@ async def bulk_import_dealers(
                 custom_fields=custom_fields_str
             )
             session.add(db_dealer)
+            validation_statuses.append("Success")
             success_count += 1
         except Exception as e:
             errors.append(f"Row {index+2}: {str(e)}")
+            validation_statuses.append(f"Failed: {str(e)}")
+
+    # Add validation_status column
+    df['validation_status'] = validation_statuses
+
+    import uuid
+    import os
+    excel_filename = f"dealers_report_{uuid.uuid4().hex[:8]}.xlsx"
+    excel_filepath = os.path.join("uploads", excel_filename)
+    df.to_excel(excel_filepath, index=False)
+    excel_download_url = f"/api/uploads/{excel_filename}"
 
     if success_count > 0:
         session.commit()
@@ -402,5 +417,6 @@ async def bulk_import_dealers(
         "message": f"Successfully processed Excel: {success_count} dealers created, {skipped_count} skipped.",
         "imported": success_count,
         "skipped": skipped_count,
-        "errors": errors
+        "errors": errors,
+        "excel_download_url": excel_download_url
     }

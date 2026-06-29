@@ -22,6 +22,12 @@ const ToolsMovementHistory = () => {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [challanDraft, setChallanDraft] = useState<DeliveryChallanOptions | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
 
   useEffect(() => {
     const fetchMovements = async () => {
@@ -56,6 +62,10 @@ const ToolsMovementHistory = () => {
       );
     });
   }, [movements, search]);
+
+  const totalPages = Math.ceil(filteredMovements.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedMovements = filteredMovements.slice(startIndex, startIndex + itemsPerPage);
 
   const downloadChallan = (m: any) => {
     const isInbound = m.to_site === storeLocation;
@@ -138,8 +148,9 @@ const ToolsMovementHistory = () => {
               <p>No movements match your search.</p>
             </div>
           ) : (
-            <div className="max-h-[600px] overflow-x-auto overflow-y-auto">
-              <Table>
+            <>
+              <div className="max-h-[600px] overflow-x-auto overflow-y-auto">
+                <Table>
                 <TableHeader className="bg-white sticky top-0 border-b border-gray-100 z-10 shadow-sm">
                   <TableRow>
                     <TableHead>Tool</TableHead>
@@ -152,8 +163,8 @@ const ToolsMovementHistory = () => {
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {filteredMovements.map((m) => {
+                 <TableBody>
+                  {paginatedMovements.map((m) => {
                     const isInbound = m.to_site === storeLocation;
                     return (
                       <TableRow key={m.id} className="hover:bg-blue-50/20">
@@ -196,9 +207,40 @@ const ToolsMovementHistory = () => {
                 </TableBody>
               </Table>
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {/* Pagination Controls */}
+            {filteredMovements.length > 0 && (
+              <div className="flex items-center justify-between gap-4 mt-4 px-2">
+                <span className="text-sm text-gray-500">
+                  Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredMovements.length)} of {filteredMovements.length} movements
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm font-medium">
+                    Page {currentPage} of {totalPages || 1}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
 
       <DeliveryChallanPreviewDialog
         open={!!challanDraft}

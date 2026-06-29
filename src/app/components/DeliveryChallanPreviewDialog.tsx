@@ -328,17 +328,17 @@ const DeliveryChallanPreviewDialog = ({
               </div>
             </div>
 
-            {/* Sales tax */}
-            <div className="space-y-2 border-t pt-4">
-              <Label className="text-xs font-semibold text-gray-500 uppercase">Sales Tax</Label>
+            {/* GST */}
+            <div className="space-y-4 pt-4 border-t">
+              <Label className="text-xs font-semibold text-gray-500 uppercase">GST NO.</Label>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Consignor's Sales Tax No. & Date</Label>
-                  <Input value={fields.consignorSalesTax} onChange={(e) => setField('consignorSalesTax', e.target.value)} />
+                <div className="space-y-2">
+                  <Label className="text-xs">Consignor's GST No. & Date</Label>
+                  <Input value={fields.consignorSalesTax || ''} onChange={(e) => setField('consignorSalesTax', e.target.value)} />
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Consignee's Sales Tax No. & Date</Label>
-                  <Input value={fields.consigneeSalesTax} onChange={(e) => setField('consigneeSalesTax', e.target.value)} />
+                <div className="space-y-2">
+                  <Label className="text-xs">Consignee's GST No. & Date</Label>
+                  <Input value={fields.consigneeSalesTax || ''} onChange={(e) => setField('consigneeSalesTax', e.target.value)} />
                 </div>
               </div>
             </div>

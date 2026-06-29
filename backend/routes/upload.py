@@ -167,6 +167,7 @@ async def upload_tools(
     custom_field_defs = session.exec(select(ToolCustomField)).all()
     
     qr_links = []
+    validation_statuses = []
     frontend_url = os.environ.get('FRONTEND_URL', 'https://localhost:5173').rstrip('/')
     frontend_url = 'https://lntqrcode.com/'
 
@@ -301,24 +302,27 @@ async def upload_tools(
             session.add(db_tool)
             successfully_imported_tools.append(db_tool)
             qr_links.append(f"{frontend_url}/view-tool/{qr_code}")
+            validation_statuses.append("Success")
             success_count += 1
         except Exception as e:
             qr_links.append("")
             errors.append(f"Row {index+2}: {str(e)}")
+            validation_statuses.append(f"Failed: {str(e)}")
+
+    # Add validation_status column
+    df['validation_status'] = validation_statuses
+    if len(qr_links) == len(df):
+        df['qr_link'] = qr_links
+
+    # Always generate and save report excel file (even if some rows failed)
+    excel_filename = f"import_report_{uuid.uuid4().hex[:8]}.xlsx"
+    excel_filepath = os.path.join(UPLOAD_DIR, excel_filename)
+    df.to_excel(excel_filepath, index=False)
+    excel_download_url = f"/api/uploads/{excel_filename}"
 
     download_url = None
-    excel_download_url = None
     if success_count > 0:
         session.commit()
-        
-        # Save updated excel file
-        if len(qr_links) == len(df):
-            df['qr_link'] = qr_links
-        
-        excel_filename = f"qrcodes_data_{uuid.uuid4().hex[:8]}.xlsx"
-        excel_filepath = os.path.join(UPLOAD_DIR, excel_filename)
-        df.to_excel(excel_filepath, index=False)
-        excel_download_url = f"/api/uploads/{excel_filename}"
         
         # Generate QR Codes ZIP
         zip_filename = f"qrcodes_{uuid.uuid4().hex[:8]}.zip"

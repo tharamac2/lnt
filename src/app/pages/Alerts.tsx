@@ -32,6 +32,14 @@ const Alerts = () => {
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAlert, setSelectedAlert] = useState<any>(null);
+  
+  const [activeTab, setActiveTab] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
 
   const fetchAlerts = async () => {
     try {
@@ -187,6 +195,49 @@ const Alerts = () => {
     </Card>
   );
 
+  const renderPaginatedList = (list: any[]) => {
+    const totalPages = Math.ceil(list.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedList = list.slice(startIndex, startIndex + itemsPerPage);
+
+    return (
+      <div className="space-y-4">
+        {paginatedList.map((alert) => (
+          <AlertCard key={alert.id} alert={alert} />
+        ))}
+        {list.length === 0 && <p className="text-gray-500 text-sm py-4">No alerts found.</p>}
+        {list.length > 0 && (
+          <div className="flex items-center justify-between gap-4 mt-4 px-2">
+            <span className="text-sm text-gray-500">
+              Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, list.length)} of {list.length} alerts
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm font-medium">
+                Page {currentPage} of {totalPages || 1}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages || totalPages === 0}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -246,7 +297,7 @@ const Alerts = () => {
       </div>
 
       {/* Alerts Tabs */}
-      <Tabs defaultValue="all" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="all" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white">
             All ({sortedAlerts.length})
@@ -263,31 +314,19 @@ const Alerts = () => {
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
-          {sortedAlerts.map((alert) => (
-            <AlertCard key={alert.id} alert={alert} />
-          ))}
-          {sortedAlerts.length === 0 && <p className="text-gray-500 text-sm py-4">No notifications yet.</p>}
+          {renderPaginatedList(sortedAlerts)}
         </TabsContent>
 
         <TabsContent value="critical" className="space-y-4">
-          {criticalAlerts.map((alert) => (
-            <AlertCard key={alert.id} alert={alert} />
-          ))}
-          {criticalAlerts.length === 0 && <p className="text-gray-500 text-sm py-4">No scrapped tools or critical alerts.</p>}
+          {renderPaginatedList(criticalAlerts)}
         </TabsContent>
 
         <TabsContent value="warning" className="space-y-4">
-          {warningAlerts.map((alert) => (
-            <AlertCard key={alert.id} alert={alert} />
-          ))}
-          {warningAlerts.length === 0 && <p className="text-gray-500 text-sm py-4">No warning alerts.</p>}
+          {renderPaginatedList(warningAlerts)}
         </TabsContent>
 
         <TabsContent value="info" className="space-y-4">
-          {infoAlerts.map((alert) => (
-            <AlertCard key={alert.id} alert={alert} />
-          ))}
-          {infoAlerts.length === 0 && <p className="text-gray-500 text-sm py-4">No info alerts.</p>}
+          {renderPaginatedList(infoAlerts)}
         </TabsContent>
       </Tabs>
 

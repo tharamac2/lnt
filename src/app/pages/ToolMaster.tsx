@@ -199,8 +199,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
 
   const [qrCode, setQrCode] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [createdByFilter, setCreatedByFilter] = useState('all');
+  const [storeFilter, setStoreFilter] = useState('all');
   const [editingToolId, setEditingToolId] = useState<number | null>(null);
   const [scanning, setScanning] = useState(false);
   const [isToolSaved, setIsToolSaved] = useState(false);
@@ -313,6 +312,8 @@ const ToolMaster = ({ user }: { user?: User }) => {
   }, [showSuccessPopup]);
 
   const [hoveredTool, setHoveredTool] = useState<any | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
 
   const filteredTools = savedTools.filter(tool => {
     const matchesSearch =
@@ -321,25 +322,32 @@ const ToolMaster = ({ user }: { user?: User }) => {
       tool.make.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tool.current_site?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus = statusFilter === 'all' || tool.status === statusFilter;
-    const matchesCreator = createdByFilter === 'all' || tool.created_by_id === parseInt(createdByFilter);
+    const matchesStore = storeFilter === 'all' || tool.current_site === storeFilter;
 
-    return matchesSearch && matchesStatus && matchesCreator;
+    return matchesSearch && matchesStore;
   });
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, storeFilter]);
+
+  const totalPages = Math.ceil(filteredTools.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedTools = filteredTools.slice(startIndex, startIndex + itemsPerPage);
 
   // Bulk selection for Existing Inventory table
   const [selectedToolIds, setSelectedToolIds] = useState<Set<number>>(new Set());
   const lastSelectedIndexRef = useRef<number>(-1);
 
   const toggleToolSelection = (toolId: number, shiftKey: boolean = false) => {
-    const currentIndex = filteredTools.findIndex((t) => t.id === toolId);
+    const currentIndex = paginatedTools.findIndex((t) => t.id === toolId);
     if (shiftKey && lastSelectedIndexRef.current >= 0) {
       const start = Math.min(lastSelectedIndexRef.current, currentIndex);
       const end = Math.max(lastSelectedIndexRef.current, currentIndex);
       setSelectedToolIds((prev) => {
         const next = new Set(prev);
         for (let i = start; i <= end; i++) {
-          next.add(filteredTools[i].id);
+          next.add(paginatedTools[i].id);
         }
         return next;
       });
@@ -357,18 +365,18 @@ const ToolMaster = ({ user }: { user?: User }) => {
     lastSelectedIndexRef.current = currentIndex;
   };
 
-  const allFilteredSelected = filteredTools.length > 0 &&
-    filteredTools.every((tool) => selectedToolIds.has(tool.id));
+  const allFilteredSelected = paginatedTools.length > 0 &&
+    paginatedTools.every((tool) => selectedToolIds.has(tool.id));
 
   const toggleSelectAll = () => {
     setSelectedToolIds((prev) => {
       if (allFilteredSelected) {
         const next = new Set(prev);
-        filteredTools.forEach((tool) => next.delete(tool.id));
+        paginatedTools.forEach((tool) => next.delete(tool.id));
         return next;
       }
       const next = new Set(prev);
-      filteredTools.forEach((tool) => next.add(tool.id));
+      paginatedTools.forEach((tool) => next.add(tool.id));
       return next;
     });
   };
@@ -957,7 +965,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
       validityPeriod: '',
       subcontractorName: '',
       previousSite: '',
-      currentSite: '',
+      currentSite: prev.currentSite,
       nextSite: '',
       supplierCode: '',
       testCertificate: '',
@@ -967,6 +975,102 @@ const ToolMaster = ({ user }: { user?: User }) => {
     setEditingToolId(null);
   };
 
+  const downloadToolsTemplate = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Tools Template');
+
+      worksheet.columns = [
+        { header: 'Description', key: 'description', width: 25 },
+        { header: 'Make', key: 'make', width: 15 },
+        { header: 'Capacity', key: 'capacity', width: 15 },
+        { header: 'Safe Working Load', key: 'safe_working_load', width: 20 },
+        { header: 'Purchaser Name', key: 'purchaser_name', width: 25 },
+        { header: 'Supplier Code', key: 'supplier_code', width: 15 },
+        { header: 'Date of Supply', key: 'date_of_supply', width: 18 },
+        { header: 'Tool Type', key: 'tool_type', width: 20 },
+        { header: 'Metal Type', key: 'metal_type', width: 15 },
+        { header: 'Tool Variant', key: 'tool_variant', width: 15 },
+        { header: 'Purchaser Contact', key: 'purchaser_contact', width: 18 },
+        { header: 'Job Code', key: 'job_code', width: 15 },
+        { header: 'Job Description', key: 'job_description', width: 25 },
+        { header: 'Location', key: 'location', width: 15 },
+        { header: 'Validation Period', key: 'validation_period', width: 18 },
+        { header: 'Item Code', key: 'item_code', width: 18 },
+      ];
+
+      worksheet.addRow({
+        description: 'DIRRECK POLE',
+        make: '2026',
+        capacity: '12M',
+        safe_working_load: '10T',
+        purchaser_name: 'L&T',
+        supplier_code: 'SUP-001',
+        date_of_supply: '2026-06-01',
+        tool_type: 'Erection Tools',
+        metal_type: 'Steel',
+        tool_variant: '12M',
+        purchaser_contact: '9876543210',
+        job_code: 'JOB-101',
+        job_description: 'Line Construction',
+        location: 'TIRUNELVELI',
+        validation_period: '3',
+        item_code: '1SETM0002000000',
+      });
+
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.eachCell((cell) => {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FF1E3A8A' }
+        };
+      });
+
+      const helperSheet = workbook.addWorksheet('Instructions');
+      helperSheet.columns = [
+        { header: 'Field Name', key: 'field', width: 25 },
+        { header: 'Mandatory', key: 'mandatory', width: 15 },
+        { header: 'Accepted Format', key: 'format', width: 35 },
+        { header: 'Validation Rules / Notes', key: 'rules', width: 60 },
+      ];
+
+      helperSheet.addRow({ field: 'Description', mandatory: 'Yes', format: 'Text', rules: 'Name of the tool (e.g. DIRRECK POLE, D SHACKLE 4.5T)' });
+      helperSheet.addRow({ field: 'Make', mandatory: 'Yes', format: 'YYYY (Numeric)', rules: 'Manufacturing year of the tool' });
+      helperSheet.addRow({ field: 'Capacity', mandatory: 'Yes', format: 'Text', rules: 'Capacity value (e.g. 12M, 5 Ton)' });
+      helperSheet.addRow({ field: 'Safe Working Load', mandatory: 'Yes', format: 'Text', rules: 'Safe working limit (e.g. 10T, 5T)' });
+      helperSheet.addRow({ field: 'Purchaser Name', mandatory: 'Yes', format: 'Text', rules: 'Entity purchaser name' });
+      helperSheet.addRow({ field: 'Supplier Code', mandatory: 'Yes', format: 'Text', rules: 'Unique identifier code of supplier' });
+      helperSheet.addRow({ field: 'Date of Supply', mandatory: 'Yes', format: 'YYYY-MM-DD or MM/DD/YYYY', rules: 'Date of supply/purchase' });
+      helperSheet.addRow({ field: 'Tool Type', mandatory: 'Yes', format: 'Text', rules: 'Choose: Erection Tools, Tackle, Equipment' });
+      helperSheet.addRow({ field: 'Metal Type', mandatory: 'Yes', format: 'Text', rules: 'E.g. Steel, Alloy, Aluminum' });
+      helperSheet.addRow({ field: 'Tool Variant', mandatory: 'Yes', format: 'Text', rules: 'Variant name (e.g. Standard, Heavy Duty)' });
+      helperSheet.addRow({ field: 'Purchaser Contact', mandatory: 'No', format: '10-digit number', rules: 'Optional contact mobile number' });
+      helperSheet.addRow({ field: 'Job Code', mandatory: 'No', format: 'Text', rules: 'Project job identifier code' });
+      helperSheet.addRow({ field: 'Job Description', mandatory: 'No', format: 'Text', rules: 'Description of the job' });
+      helperSheet.addRow({ field: 'Location', mandatory: 'Yes', format: 'Text', rules: 'Assigned store location name (must match a valid site)' });
+      helperSheet.addRow({ field: 'Validation Period', mandatory: 'No', format: 'Numeric (Years)', rules: 'Years until expiration (defaults to 3 years)' });
+      helperSheet.addRow({ field: 'Item Code', mandatory: 'No', format: 'Text', rules: 'Optional item code. If blank, matches by description config' });
+
+      const helperHeader = helperSheet.getRow(1);
+      helperHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      helperHeader.eachCell((cell) => {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FF10B981' }
+        };
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(new Blob([buffer]), 'bulk_import_tools_template.xlsx');
+      toast.success('Sample template downloaded successfully');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to generate template');
+    }
+  };
 
   const handleBulkUpload = async () => {
     if (!importFile) {
@@ -1113,13 +1217,18 @@ const ToolMaster = ({ user }: { user?: User }) => {
               )}
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setIsImportModalOpen(false); setImportFile(null); }}>
-              Cancel
+          <DialogFooter className="flex flex-col sm:flex-row justify-between items-center w-full gap-2">
+            <Button type="button" variant="outline" onClick={downloadToolsTemplate} className="text-emerald-700 border-emerald-200 hover:bg-emerald-50 w-full sm:w-auto mr-auto">
+              Download Sample Template
             </Button>
-            <Button onClick={handleBulkUpload} disabled={!importFile || isUploading} className="bg-indigo-600 hover:bg-indigo-700">
-              {isUploading ? "Importing..." : "Start Import"}
-            </Button>
+            <div className="flex gap-2 w-full sm:w-auto justify-end">
+              <Button variant="outline" onClick={() => { setIsImportModalOpen(false); setImportFile(null); }} className="w-full sm:w-auto">
+                Cancel
+              </Button>
+              <Button onClick={handleBulkUpload} disabled={!importFile || isUploading} className="bg-indigo-600 hover:bg-indigo-700 w-full sm:w-auto">
+                {isUploading ? "Importing..." : "Start Import"}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1411,29 +1520,31 @@ const ToolMaster = ({ user }: { user?: User }) => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 pt-6 border-t">
                     <div className="space-y-2">
                       <Label htmlFor="currentSite">Current Site / Store <span className="text-red-600">*</span></Label>
-                      {user?.role === 'data_entry' ? (
+                      {user?.role === 'data_entry' || user?.role === 'admin' ? (
+                        allSites.length === 0 ? (
+                          <div className="text-sm text-amber-600 border border-amber-200 bg-amber-50 rounded-md px-3 py-2">
+                            ⚠️ No stores created yet. Please add a Store Manager in User Management first.
+                          </div>
+                        ) : (
+                          <Select
+                            value={toolData.currentSite}
+                            onValueChange={value => handleInputChange('currentSite', value)}
+                          >
+                            <SelectTrigger className={errors.currentSite ? 'border-red-500' : ''}>
+                              <SelectValue placeholder="Select Store / Site" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allSites.map(site => (
+                                <SelectItem key={site} value={site}>{site}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )
+                      ) : (
                         <div className="h-10 px-3 py-2 rounded-md border border-input bg-blue-50 text-blue-800 font-semibold text-sm flex items-center gap-2">
                           <Activity className="w-4 h-4 text-blue-500" />
-                          {user.site || 'No Site Assigned'}
+                          {user?.site || 'No Site Assigned'}
                         </div>
-                      ) : allSites.length === 0 ? (
-                        <div className="text-sm text-amber-600 border border-amber-200 bg-amber-50 rounded-md px-3 py-2">
-                          ⚠️ No stores created yet. Please add a Store Manager in User Management first.
-                        </div>
-                      ) : (
-                        <Select
-                          value={toolData.currentSite}
-                          onValueChange={value => handleInputChange('currentSite', value)}
-                        >
-                          <SelectTrigger className={errors.currentSite ? 'border-red-500' : ''}>
-                            <SelectValue placeholder="Select Store / Site" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {allSites.map(site => (
-                              <SelectItem key={site} value={site}>{site}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
                       )}
                     </div>
                   </div>
@@ -1766,42 +1877,29 @@ const ToolMaster = ({ user }: { user?: User }) => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <div className="w-full md:w-[200px]">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="usable">Usable</SelectItem>
-                  <SelectItem value="under-repair">Under Repair</SelectItem>
-                  <SelectItem value="scrap">Scrap</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {(user?.role === 'admin' || user?.role === 'data_entry') && (
-              <div className="flex flex-col gap-2">
-                <Button
-                  onClick={handleMarkPrinted}
-                  disabled={selectedToolIds.size === 0}
-                  className="bg-green-600 hover:bg-green-700 text-xs h-8 whitespace-nowrap"
-                >
-                  <Printer className="w-3 h-3 mr-1" /> Mark Printed ({selectedToolIds.size})
-                </Button>
-                <div className="w-full md:w-[200px]">
-                  <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Filter by User" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Users</SelectItem>
-                      {allUsers.map(u => (
-                        <SelectItem key={u.id} value={u.id.toString()}>{u.full_name || u.username}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            {user?.role === 'admin' && allSites.length > 0 && (
+              <div className="w-full md:w-[200px]">
+                <Select value={storeFilter} onValueChange={setStoreFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by Store" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Stores</SelectItem>
+                    {allSites.map(site => (
+                      <SelectItem key={site} value={site}>{site}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+            )}
+            {(user?.role === 'admin' || user?.role === 'data_entry') && (
+              <Button
+                onClick={handleMarkPrinted}
+                disabled={selectedToolIds.size === 0}
+                className="bg-green-600 hover:bg-green-700 text-xs h-9 whitespace-nowrap"
+              >
+                <Printer className="w-3.5 h-3.5 mr-1" /> Mark Printed ({selectedToolIds.size})
+              </Button>
             )}
             <div className="flex gap-2">
               <Button
@@ -1850,8 +1948,8 @@ const ToolMaster = ({ user }: { user?: User }) => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTools.length > 0 ? (
-                  filteredTools.map((tool) => (
+                {paginatedTools.length > 0 ? (
+                  paginatedTools.map((tool) => (
                     <TableRow key={tool.id} className={`hover:bg-gray-50/50 ${selectedToolIds.has(tool.id) ? 'bg-blue-50/30' : ''}`}>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <Checkbox
@@ -1964,7 +2062,7 @@ const ToolMaster = ({ user }: { user?: User }) => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={user?.role === 'admin' ? 10 : 9} className="h-24 text-center">
+                    <TableCell colSpan={user?.role === 'admin' ? 12 : 11} className="h-24 text-center">
                       No tools found matching your criteria.
                     </TableCell>
                   </TableRow>
@@ -1972,6 +2070,36 @@ const ToolMaster = ({ user }: { user?: User }) => {
               </TableBody>
             </Table>
           </div>
+
+          {/* Pagination Controls */}
+          {filteredTools.length > 0 && (
+            <div className="flex items-center justify-between gap-4 mt-4 px-2">
+              <span className="text-sm text-gray-500">
+                Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredTools.length)} of {filteredTools.length} tools
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm font-medium">
+                  Page {currentPage} of {totalPages || 1}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages || totalPages === 0}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 

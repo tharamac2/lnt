@@ -53,6 +53,27 @@ function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
 
+  const [dashboardRoles, setDashboardRoles] = useState<string[]>(() => {
+    const saved = localStorage.getItem('dashboard_access_roles');
+    return saved ? JSON.parse(saved) : ['admin', 'management'];
+  });
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const saved = localStorage.getItem('dashboard_access_roles');
+      if (saved) {
+        setDashboardRoles(JSON.parse(saved));
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  const hasDashboardAccess = (role: string) => {
+    if (role === 'admin') return true;
+    return dashboardRoles.includes(role);
+  };
+
   const handleLogin = (user: User) => {
     setUser(user);
   };
@@ -118,7 +139,6 @@ function App() {
             <>
               <Route path="/" element={<Navigate to="/tool-master" replace />} />
               <Route path="/tool-master" element={<ToolMaster user={user} />} />
-              <Route path="/dashboard" element={<Dashboard user={user} />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/alerts" element={<Alerts />} />
               <Route path="/users" element={<UsersManagement />} />
@@ -168,7 +188,6 @@ function App() {
           {user.role === "management" && (
             <>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard user={user} />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/alerts" element={<Alerts />} />
             </>
@@ -189,6 +208,11 @@ function App() {
               <Route path="/" element={<Navigate to="/tool-master" replace />} />
               <Route path="/tool-master" element={<ToolMaster user={user} />} />
             </>
+          )}
+
+          {/* Dynamic Dashboard Route */}
+          {hasDashboardAccess(user.role) && (
+            <Route path="/dashboard" element={<Dashboard user={user} />} />
           )}
 
           {/* Catch-all */}

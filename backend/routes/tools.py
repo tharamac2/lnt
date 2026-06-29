@@ -266,13 +266,12 @@ def create_tool(tool: ToolCreate, session: Session = Depends(get_session), curre
     db_tool = Tool.from_orm(tool)
     db_tool.created_by_id = current_user.id
     
-    # If Data Entry user, enforce their assigned site and validate it exists
+    # If Data Entry user, validate they have a site, but allow specifying a target site
     if current_user.role == "data_entry":
         if not current_user.site:
             raise HTTPException(status_code=403, detail="No site assigned to this Data Entry user.")
-        
-        # Enforce site - data entry users can only add tools to their assigned site
-        db_tool.current_site = current_user.site
+        if not db_tool.current_site:
+            db_tool.current_site = current_user.site
 
     session.add(db_tool)
     session.commit()
@@ -330,9 +329,7 @@ def read_tools(
 ):
     query = select(Tool).where(Tool.is_deleted == False)
     
-    # Filtering for Data Entry role: show only their assigned site
-    if current_user.role == "data_entry" and current_user.site:
-        query = query.where(Tool.current_site == current_user.site)
+    # Allow data entry to view other stores/sites when they switch site
     
     if search:
         query = query.where(Tool.description.contains(search) | Tool.qr_code.contains(search))

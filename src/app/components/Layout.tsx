@@ -185,7 +185,28 @@ const Layout = ({ children, user, onLogout }: LayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const filteredNavItems = navItems.filter(item => item.roles.includes(user.role));
+  const [dashboardRoles, setDashboardRoles] = useState<string[]>(() => {
+    const saved = localStorage.getItem('dashboard_access_roles');
+    return saved ? JSON.parse(saved) : ['admin', 'management'];
+  });
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const saved = localStorage.getItem('dashboard_access_roles');
+      if (saved) {
+        setDashboardRoles(JSON.parse(saved));
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  const filteredNavItems = navItems.filter(item => {
+    if (item.path === '/dashboard') {
+      return dashboardRoles.includes(user.role);
+    }
+    return item.roles.includes(user.role);
+  });
 
   const [alerts, setAlerts] = useState<any[]>([]);
 

@@ -47,7 +47,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), session: Session
         raise credentials_exception
 
     if payload.get("type") == "inspector":
-        statement = select(Inspector).where(Inspector.email == username)
+        statement = select(Inspector).where(Inspector.employee_id == username)
         inspector = session.exec(statement).first()
         if inspector is None:
             raise credentials_exception

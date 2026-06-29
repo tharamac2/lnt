@@ -240,13 +240,13 @@ export const buildDeliveryChallanDoc = async (options: DeliveryChallanOptions): 
   if (totalAmount) doc.text(String(totalAmount), left + gatePassWidth + 22, y + 6);
   y += 14;
 
-  // --- Sales Tax Row ---
+  // --- GST Row ---
   doc.rect(left, y, width, 16);
   doc.line(left + width / 2, y, left + width / 2, y + 16);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text("CONSIGNOR'S SALES TAX NO. & DATE", left + 2, y + 6);
-  doc.text("CONSIGNEE'S SALES TAX NO. & DATE", left + width / 2 + 2, y + 6);
+  doc.text("CONSIGNOR'S GST NO. & DATE", left + 2, y + 6);
+  doc.text("CONSIGNEE'S GST NO. & DATE", left + width / 2 + 2, y + 6);
   doc.setFont('helvetica', 'normal');
   if (consignorSalesTax) doc.text(consignorSalesTax, left + 2, y + 12, { maxWidth: width / 2 - 4 });
   if (consigneeSalesTax) doc.text(consigneeSalesTax, left + width / 2 + 2, y + 12, { maxWidth: width / 2 - 4 });

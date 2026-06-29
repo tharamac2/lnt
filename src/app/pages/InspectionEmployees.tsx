@@ -41,6 +41,12 @@ const InspectionEmployees = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<InspectorEntry | null>(null);
   const [employeeInspections, setEmployeeInspections] = useState<any[]>([]);
   const [loadingInspections, setLoadingInspections] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
 
   const fetchEmployees = async () => {
     try {
@@ -119,6 +125,10 @@ const InspectionEmployees = () => {
     }
   };
 
+  const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedEmployees = filteredEmployees.slice(startIndex, startIndex + itemsPerPage);
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -181,8 +191,9 @@ const InspectionEmployees = () => {
               <p>No employee profiles match your search.</p>
             </div>
           ) : (
-            <div className="max-h-[600px] overflow-x-auto overflow-y-auto [&>div]:overflow-visible">
-              <Table className="border-separate border-spacing-0">
+            <>
+              <div className="max-h-[600px] overflow-x-auto overflow-y-auto [&>div]:overflow-visible">
+                <Table className="border-separate border-spacing-0">
                 <TableHeader className="sticky top-0 border-b border-gray-100 z-10 shadow-sm [&_th]:bg-white">
                   <TableRow>
                     <TableHead>Inspector Name</TableHead>
@@ -196,7 +207,7 @@ const InspectionEmployees = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredEmployees.map((emp) => (
+                  {paginatedEmployees.map((emp) => (
                     <TableRow key={emp.id} className="hover:bg-blue-50/20">
                       <TableCell>
                         <button
@@ -241,8 +252,39 @@ const InspectionEmployees = () => {
                 </TableBody>
               </Table>
             </div>
-          )}
-        </CardContent>
+
+            {/* Pagination Controls */}
+            {filteredEmployees.length > 0 && (
+              <div className="flex items-center justify-between gap-4 mt-4 px-2">
+                <span className="text-sm text-gray-500">
+                  Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredEmployees.length)} of {filteredEmployees.length} employees
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm font-medium">
+                    Page {currentPage} of {totalPages || 1}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
       </Card>
 
       <Dialog open={!!selectedEmployee} onOpenChange={(open) => !open && setSelectedEmployee(null)}>

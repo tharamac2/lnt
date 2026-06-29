@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import api from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -292,6 +292,14 @@ const ToolHistoryPage = () => {
     }
   };
 
+  const ITEMS_PER_PAGE = 50;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Reset page to 1 when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
+
   const filteredTools = tools.filter(tool => {
     const matchesSearch =
       tool.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -301,6 +309,12 @@ const ToolHistoryPage = () => {
 
     return matchesSearch && matchesStatus;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredTools.length / ITEMS_PER_PAGE));
+  const pagedTools = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredTools.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredTools, currentPage]);
 
   return (
     <div className="space-y-6">
@@ -379,9 +393,9 @@ const ToolHistoryPage = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTools.map((tool, index) => (
+                  {pagedTools.map((tool, index) => (
                     <TableRow key={tool.id} className="hover:bg-gray-50/50 transition-colors">
-                      <TableCell className="font-medium text-gray-500">{index + 1}</TableCell>
+                      <TableCell className="font-medium text-gray-500">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className="font-semibold text-gray-800">{tool.description}</TableCell>
                       <TableCell className="font-mono text-xs text-indigo-600 font-semibold">{tool.qr_code}</TableCell>
                       <TableCell className="text-sm text-gray-650">
@@ -420,6 +434,35 @@ const ToolHistoryPage = () => {
             </div>
           )}
         </CardContent>
+        {filteredTools.length > 0 && (
+          <div className="flex items-center justify-between gap-4 p-4 border-t border-gray-100 bg-gray-50/30">
+            <p className="text-sm text-gray-500">
+              Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-
+              {Math.min(currentPage * ITEMS_PER_PAGE, filteredTools.length)} of {filteredTools.length} entries
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-gray-600 px-2 font-medium">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>      {/* Lifecycle Details Dialog */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
         <DialogContent className="max-w-6xl sm:max-w-6xl w-[90vw] max-h-[90vh] overflow-y-auto bg-slate-50">

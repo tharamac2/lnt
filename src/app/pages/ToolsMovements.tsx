@@ -36,8 +36,10 @@ const ToolsMovements = () => {
 
   // Dealers (Sub Contractor / Supplier / Scrap Dealer) for auto-fill dropdowns
   const [dealers, setDealers] = useState<any[]>([]);
+  const [stores, setStores] = useState<string[]>([]);
   useEffect(() => {
     api.get('/dealers/').then((res) => setDealers(res.data || [])).catch((err) => console.error('Failed to fetch dealers', err));
+    api.get('/users/stores').then((res) => setStores(res.data.stores || [])).catch((err) => console.error('Failed to fetch stores', err));
   }, []);
   const dealersByCategory = (category: string) => dealers.filter((d) => d.category === category);
   const applyBulkDealer = (dealerId: string) => {
@@ -245,10 +247,15 @@ const ToolsMovements = () => {
       }
     }
 
-    if (bulkActionMode === 'out' && bulkOutSubCategory === 'site_transfer' && !bulkFormData.targetSite) {
-      toast.error("Please enter a destination site");
-      return;
-    }
+      if (bulkActionMode === 'out' && bulkOutSubCategory === 'site_transfer' && !bulkFormData.targetSite) {
+        toast.error("Please enter a destination site");
+        return;
+      }
+
+      if (bulkActionMode === 'out' && bulkOutSubCategory === 'store_transfer' && !bulkFormData.targetSite) {
+        toast.error("Please select a destination store");
+        return;
+      }
 
     if (bulkActionMode === 'in') {
       for (const tool of notReturnedTools) {
@@ -268,7 +275,7 @@ const ToolsMovements = () => {
 
     let toolsToProcess = [...bulkTools];
     if (bulkActionMode === 'out') {
-      if (bulkOutSubCategory === 'subcon_work' || bulkOutSubCategory === 'site_transfer') {
+      if (bulkOutSubCategory === 'subcon_work' || bulkOutSubCategory === 'site_transfer' || bulkOutSubCategory === 'store_transfer') {
         toolsToProcess = bulkTools.filter((t) => t.status === 'usable');
         if (toolsToProcess.length === 0) {
           toast.error("No eligible working tools (usable) found in selection for this transfer.");
@@ -325,6 +332,10 @@ const ToolsMovements = () => {
               : '';
             payload.remarks = `New Product Received.${supplierInfo} ${bulkFormData.remarks}${checklistStr}`;
           } else if (bulkInSubCategory === 'site_receive') {
+            payload.subcontractor_name = null;
+            payload.subcontractor_code = null;
+            payload.subcontractor_mobile = null;
+            payload.debit_to = null;
             payload.remarks = `Received from Site ${tool.current_site}. ${bulkFormData.remarks}${checklistStr}`;
           } else if (bulkInSubCategory === 'found_recovered') {
             payload.debit_to = null;
@@ -344,6 +355,12 @@ const ToolsMovements = () => {
             payload.subcontractor_name = null;
             payload.subcontractor_code = null;
             payload.remarks = `Transferred to Site: ${bulkFormData.targetSite} (Bulk). ${bulkFormData.remarks}${checklistStr}`;
+          } else if (bulkOutSubCategory === 'store_transfer') {
+            payload.current_site = bulkFormData.targetSite;
+            payload.subcontractor_name = null;
+            payload.subcontractor_code = null;
+            payload.subcontractor_mobile = null;
+            payload.remarks = `Transferred to Store: ${bulkFormData.targetSite} (Bulk). ${bulkFormData.remarks}${checklistStr}`;
           } else if (bulkOutSubCategory === 'scrap_disposal') {
             payload.status = 'scrapped';
             payload.current_site = 'Scrap Yard';
@@ -662,20 +679,24 @@ const ToolsMovements = () => {
             {bulkActionMode === 'out' && (
               <div className="space-y-4 animate-in slide-in-from-right-2">
                 <Label>Despatch Type</Label>
-                <RadioGroup value={bulkOutSubCategory} onValueChange={setBulkOutSubCategory} className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-gray-50">
-                    <RadioGroupItem value="subcon_work" id="bd1" />
-                    <Label htmlFor="bd1" className="cursor-pointer">Issue to Sub-Contractor</Label>
-                  </div>
-                  <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-gray-50">
-                    <RadioGroupItem value="site_transfer" id="bd2" />
-                    <Label htmlFor="bd2" className="cursor-pointer">Transfer to Next Site</Label>
-                  </div>
-                  <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-red-50 border-red-200">
-                    <RadioGroupItem value="scrap_disposal" id="bd3" />
-                    <Label htmlFor="bd3" className="cursor-pointer text-red-700">Issue to Scrap Dealer</Label>
-                  </div>
-                </RadioGroup>
+                    <RadioGroup value={bulkOutSubCategory} onValueChange={setBulkOutSubCategory} className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                      <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-gray-50">
+                        <RadioGroupItem value="subcon_work" id="bd1" />
+                        <Label htmlFor="bd1" className="cursor-pointer">Issue to Sub-Contractor</Label>
+                      </div>
+                      <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-gray-50">
+                        <RadioGroupItem value="site_transfer" id="bd2" />
+                        <Label htmlFor="bd2" className="cursor-pointer">Transfer to Next Site</Label>
+                      </div>
+                      <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-blue-50 border-blue-200">
+                        <RadioGroupItem value="store_transfer" id="bd4" />
+                        <Label htmlFor="bd4" className="cursor-pointer text-blue-700">Transfer to Next Store</Label>
+                      </div>
+                      <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-red-50 border-red-200">
+                        <RadioGroupItem value="scrap_disposal" id="bd3" />
+                        <Label htmlFor="bd3" className="cursor-pointer text-red-700">Issue to Scrap Dealer</Label>
+                      </div>
+                    </RadioGroup>
 
                 <p className="text-xs text-gray-500">
                   * Note: Despatches to Sub-Contractor / Site will automatically filter and only transfer <strong>usable (working condition)</strong> tools.
@@ -821,12 +842,36 @@ const ToolsMovements = () => {
 
               {((bulkActionMode === 'out' && (bulkOutSubCategory === 'subcon_work' || bulkOutSubCategory === 'site_transfer')) || (bulkActionMode === 'in' && bulkInSubCategory === 'site_receive')) && (
                 <div className="space-y-2">
-                  <Label>{bulkActionMode === 'out' ? 'Destination Site' : 'Origin Site (Optional)'}</Label>
+                  <Label>
+                    {bulkActionMode === 'out' 
+                      ? (bulkOutSubCategory === 'subcon_work' ? 'Site Code' : 'Next Site Code') 
+                      : 'Origin Site (Optional)'}
+                  </Label>
                   <Input
-                    placeholder="Site Name"
+                    placeholder={
+                      bulkActionMode === 'out'
+                        ? (bulkOutSubCategory === 'subcon_work' ? 'Site Code' : 'Site Name')
+                        : 'Site Name'
+                    }
                     value={bulkFormData.targetSite}
                     onChange={(e) => setBulkFormData({ ...bulkFormData, targetSite: e.target.value })}
                   />
+                </div>
+              )}
+
+              {(bulkActionMode === 'out' && bulkOutSubCategory === 'store_transfer') && (
+                <div className="space-y-2">
+                  <Label>Next Store</Label>
+                  <select
+                    value={bulkFormData.targetSite}
+                    onChange={(e) => setBulkFormData({ ...bulkFormData, targetSite: e.target.value })}
+                    className="w-full h-10 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">-- Select Destination Store --</option>
+                    {stores.map((s, i) => (
+                      <option key={i} value={s}>{s}</option>
+                    ))}
+                  </select>
                 </div>
               )}
 

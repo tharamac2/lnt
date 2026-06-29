@@ -24,6 +24,8 @@ export default function Reports() {
     const [globalSearch, setGlobalSearch] = useState("");
     const [filters, setFilters] = useState<Record<string, string>>({});
     const [hoveredTool, setHoveredTool] = useState<any | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 50;
 
     useEffect(() => {
         const fetchTools = async () => {
@@ -37,6 +39,10 @@ export default function Reports() {
         };
         fetchTools();
     }, []);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [globalSearch, filters]);
 
     const handleFilterChange = (key: string, value: string) => {
         setFilters(prev => ({ ...prev, [key]: value }));
@@ -65,6 +71,10 @@ export default function Reports() {
             return toolVal.includes(filterVal.toLowerCase());
         });
     });
+
+    const totalPages = Math.ceil(filteredTools.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedTools = filteredTools.slice(startIndex, startIndex + itemsPerPage);
 
     const downloadCSV = () => {
         if (filteredTools.length === 0) return;
@@ -254,8 +264,8 @@ export default function Reports() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredTools.length > 0 ? (
-                                    filteredTools.map((tool) => (
+                                {paginatedTools.length > 0 ? (
+                                    paginatedTools.map((tool, index) => (
                                         <TableRow key={tool.id} className="hover:bg-gray-50/50">
                                             <TableCell className="font-medium text-[#1E3A8A]">
                                                 {tool.description}
@@ -295,7 +305,7 @@ export default function Reports() {
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={12} className="h-24 text-center">
+                                        <TableCell colSpan={13} className="h-24 text-center">
                                             No tools found matching your filters.
                                         </TableCell>
                                     </TableRow>
@@ -303,6 +313,36 @@ export default function Reports() {
                             </TableBody>
                         </Table>
                     </div>
+
+                    {/* Pagination Controls */}
+                    {filteredTools.length > 0 && (
+                        <div className="flex items-center justify-between gap-4 mt-4 px-2">
+                            <span className="text-sm text-gray-500">
+                                Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredTools.length)} of {filteredTools.length} tools
+                            </span>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    Previous
+                                </Button>
+                                <span className="text-sm font-medium">
+                                    Page {currentPage} of {totalPages || 1}
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                >
+                                    Next
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 

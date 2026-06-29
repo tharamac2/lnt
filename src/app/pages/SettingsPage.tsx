@@ -31,6 +31,35 @@ const SettingsPage = () => {
   });
   const [isBackingUp, setIsBackingUp] = useState(false);
 
+  const [dashboardRoles, setDashboardRoles] = useState<string[]>(() => {
+    const saved = localStorage.getItem('dashboard_access_roles');
+    return saved ? JSON.parse(saved) : ['admin', 'management'];
+  });
+
+  const ROLES_LIST = [
+    { id: 'management', name: 'Management' },
+    { id: 'store', name: 'Store Manager' },
+    { id: 'inspector', name: 'Inspector' },
+    { id: 'inspection_employee', name: 'Inspection Employee' },
+    { id: 'data_entry', name: 'Data Entry' },
+    { id: 'worker', name: 'Worker' }
+  ];
+
+  const handleToggleDashboardRole = (roleId: string) => {
+    setDashboardRoles(prev => {
+      let next;
+      if (prev.includes(roleId)) {
+        next = prev.filter(r => r !== roleId);
+      } else {
+        next = [...prev, roleId];
+      }
+      localStorage.setItem('dashboard_access_roles', JSON.stringify(next));
+      window.dispatchEvent(new Event('storage'));
+      return next;
+    });
+    toast.success('Dashboard access permission updated');
+  };
+
   // --- Validation helpers ---
   const isValidEmail = (email: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -240,12 +269,44 @@ const SettingsPage = () => {
                 <Input type="password" placeholder="Confirm new password" />
               </div>
               <Separator />
+              <Separator />
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">Two-Factor Authentication</p>
                   <p className="text-sm text-gray-500">Add an extra layer of security</p>
                 </div>
                 <Switch />
+              </div>
+              <Separator />
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-[#1E3A8A]" />
+                    Dashboard Access Permissions
+                  </h3>
+                  <p className="text-xs text-gray-500">Grant or revoke Management Dashboard access for each user role</p>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <div>
+                      <p className="font-medium text-sm">Administrator (admin)</p>
+                      <p className="text-xs text-gray-400">Always has dashboard access (disabled)</p>
+                    </div>
+                    <Switch checked={true} disabled={true} />
+                  </div>
+                  {ROLES_LIST.map(role => (
+                    <div key={role.id} className="flex items-center justify-between border-b pb-2">
+                      <div>
+                        <p className="font-medium text-sm">{role.name} ({role.id})</p>
+                        <p className="text-xs text-gray-400">Allow users with this role to access the Management Dashboard</p>
+                      </div>
+                      <Switch
+                        checked={dashboardRoles.includes(role.id)}
+                        onCheckedChange={() => handleToggleDashboardRole(role.id)}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
               <Separator />
               <Button className="bg-[#1E3A8A]" onClick={handleSaveSettings}>
