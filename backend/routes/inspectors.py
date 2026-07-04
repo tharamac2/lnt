@@ -167,18 +167,4 @@ def delete_inspector(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized to delete employee records")
-
-    inspector = session.get(Inspector, inspector_id)
-    if not inspector:
-        raise HTTPException(status_code=404, detail="Employee record not found")
-
-    log_action(
-        session, current_user, "delete", "Inspector", inspector_id,
-        f"Deleted inspection employee {inspector.name} ({inspector.employee_id})",
-        site=current_user.site,
-    )
-    session.delete(inspector)
-    session.commit()
-    return {"ok": True}
+    raise HTTPException(status_code=400, detail="Inspectors cannot be deleted. Please disable their account instead.")

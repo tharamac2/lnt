@@ -363,24 +363,9 @@ async def read_users_me(current_user = Depends(get_current_user)):
         }
     return UserRead(**current_user.dict(exclude={"hashed_password"}))
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{user_id}", status_code=status.HTTP_400_BAD_REQUEST)
 def delete_user(user_id: int, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized to delete users")
-        
-    user = session.get(User, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    log_action(
-        session, current_user, "delete", "User", user_id,
-        f"Deleted user {user.full_name or user.username} ({user.role})",
-        site=user.site,
-    )
-
-    session.delete(user)
-    session.commit()
-    return None
+    raise HTTPException(status_code=400, detail="Users cannot be deleted. Please disable their account instead.")
 
 @router.patch("/{user_id}", response_model=UserRead)
 def update_user(user_id: int, user_update: UserUpdate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
