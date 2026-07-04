@@ -335,22 +335,7 @@ const UsersManagement = () => {
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) return;
 
-    try {
-      if (userId.startsWith('insp-')) {
-        await api.delete(`/inspectors/${userId.replace('insp-', '')}`);
-      } else {
-        await api.delete(`/users/${userId}`);
-      }
-      setUsers(users.filter(u => u.id !== userId));
-      toast.success('User deleted successfully');
-    } catch (error) {
-      console.error("Failed to delete user", error);
-      toast.error("Failed to delete user");
-    }
-  };
 
   const toggleUserStatus = async (userId: string) => {
     const userToToggle = users.find(u => u.id === userId);
@@ -824,13 +809,6 @@ const UsersManagement = () => {
                             <Edit className="w-4 h-4" />
                           </Button>
                         )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDeleteUser(user.id)}
-                        >
-                          <Trash2 className="w-4 h-4 text-red-600" />
-                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
