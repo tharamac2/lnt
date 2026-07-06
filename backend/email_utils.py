@@ -10,6 +10,7 @@ load_dotenv()
 
 GMAIL_USER = os.environ.get("GMAIL_USER")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
+OTP_SENDER_PHONE = os.environ.get("OTP_SENDER_PHONE", "9123585284")
 
 OTP_TTL_MINUTES = 10
 
@@ -114,7 +115,7 @@ def send_otp_sms(to_phone: str) -> str:
         "verified": False,
     }
     
-    print(f"\n[OTP VERIFICATION] SMS OTP generated: {otp} for phone {to_phone} (Sender: 9123585284)\n")
+    print(f"\n[OTP VERIFICATION] SMS OTP generated: {otp} for phone {to_phone} (Sender: {OTP_SENDER_PHONE})\n")
     
     # Twilio API Integration
     account_sid = os.environ.get("TWILIO_ACCOUNT_SID")

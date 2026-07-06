@@ -168,8 +168,8 @@ async def upload_tools(
     
     qr_links = []
     validation_statuses = []
-    frontend_url = os.environ.get('FRONTEND_URL', 'https://localhost:5173').rstrip('/')
-    frontend_url = 'https://lntqrcode.com/'
+    # Set FRONTEND_URL in backend/.env on the live server - never hardcode it here.
+    frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173').rstrip('/')
 
     for index, row in df.iterrows():
         try:

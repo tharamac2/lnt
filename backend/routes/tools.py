@@ -263,9 +263,13 @@ def resequence_unprinted_tools(session: Session, deleted_qr_code: str):
 
 @router.post("/", response_model=ToolRead)
 def create_tool(tool: ToolCreate, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
+    existing = session.exec(select(Tool).where(Tool.qr_code == tool.qr_code)).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="A tool with this QR code already exists")
+
     db_tool = Tool.from_orm(tool)
     db_tool.created_by_id = current_user.id
-    
+
     # If Data Entry user, validate they have a site, but allow specifying a target site
     if current_user.role == "data_entry":
         if not current_user.site:

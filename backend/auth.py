@@ -1,5 +1,7 @@
+import os
 from datetime import datetime, timedelta
 from typing import Optional
+from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -8,8 +10,12 @@ from sqlmodel import Session, select
 from .database import get_session
 from .models import User, Inspector
 
-# Change this to a secure secret key in production
-SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
+load_dotenv()
+
+# SECRET_KEY must be set in backend/.env - never hardcode it in source.
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY environment variable is not set. Add it to backend/.env.")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30  # 30 days - keep users logged in until explicit logout
 

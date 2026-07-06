@@ -72,7 +72,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
                 return {
                     "otp_required": True,
                     "phone": user.phone,
-                    "sender_phone": "9123585284"
+                    "sender_phone": email_utils.OTP_SENDER_PHONE
                 }
             else:
                 try:
@@ -123,7 +123,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             return {
                 "otp_required": True,
                 "phone": inspector.contact_number,
-                "sender_phone": "9123585284"
+                "sender_phone": email_utils.OTP_SENDER_PHONE
             }
         else:
             try:

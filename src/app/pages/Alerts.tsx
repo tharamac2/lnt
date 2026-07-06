@@ -130,12 +130,19 @@ const Alerts = () => {
     }
   };
 
-  const handleResolve = (id: number) => {
-    toast.success('Alert resolved');
-  };
+  const handleMarkAllAsRead = async () => {
+    const unreadIds = alerts.filter(a => !a.is_read && a.id > 0).map(a => a.id);
 
-  const handleMarkAllAsRead = () => {
-    toast.success('All alerts marked as read');
+    // Optimistic update
+    setAlerts(prev => prev.map(a => (!a.is_read ? { ...a, is_read: true } : a)));
+
+    try {
+      await Promise.all(unreadIds.map(id => api.post(`/alerts/${id}/read`)));
+      toast.success('All alerts marked as read');
+    } catch (error) {
+      console.error("Failed to mark all as read", error);
+      toast.error("Failed to mark all alerts as read");
+    }
   };
 
   const handleViewDetails = (alert: any) => {

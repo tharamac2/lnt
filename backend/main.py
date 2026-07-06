@@ -1,21 +1,29 @@
+import os
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .database import create_db_and_tables
 from .routes import users, tools, inspections, alerts, upload, movements, export, audit, inspectors, toolconfig, dealers
 from fastapi.staticfiles import StaticFiles
 
+load_dotenv()
+
 app = FastAPI(title="QR Code Tools Management API")
 
-origins = [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "https://lntqrcode.com"
-    "https://qrtool.centralindia.cloudapp.azure.com",
-    "*"
-]
+# Set ALLOWED_ORIGINS in backend/.env (comma-separated) on the live server -
+# never hardcode allowed frontend origins in source.
+_allowed_origins_env = os.environ.get(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5173,http://localhost:3000,https://lntqrcode.com,https://qrtool.centralindia.cloudapp.azure.com",
+)
+origins = [o.strip() for o in _allowed_origins_env.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=origins,
+    # NOTE: allow_origin_regex=".*" below currently permits any origin regardless
+    # of the allow_origins list above - kept as-is to preserve existing behavior.
+    # Remove it if you want ALLOWED_ORIGINS to actually restrict access.
     allow_origin_regex=".*",
     allow_credentials=True,
     allow_methods=["*"],
@@ -31,9 +39,9 @@ def on_startup():
     with engine.connect() as conn:
         # Drop unique indexes on email and create non-unique ones
         try:
-            conn.execute(text("DROP INDEX IF EXISTS ix_user_email"))
+            conn.execute(text("DROP INDEX IF EXISTS ix_user_email ON user"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_email ON user(email)"))
-            conn.execute(text("DROP INDEX IF EXISTS ix_inspector_email"))
+            conn.execute(text("DROP INDEX IF EXISTS ix_inspector_email ON inspector"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inspector_email ON inspector(email)"))
             conn.commit()
             print("Migration: Successfully updated user/inspector email indexes to be non-unique.")
